@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "999366529921",
+    "project_id": "rozrides-789f0",
+    "storage_bucket": "rozrides-789f0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999366529921:android:1eb55bc31f3cb0da2b8e80",
+        "android_client_info": {
+          "package_name": "com.example.rozrides"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASb9cJ1oxoWA8plIV-C_3XthRiHPdYDnU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
