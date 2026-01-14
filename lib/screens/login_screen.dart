@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../widgets/custom_button.dart';
+
 import '../widgets/custom_text_field.dart';
 import 'main_navigation.dart';
 import 'signup_screen.dart';
@@ -94,15 +94,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(16),
+                                  width: 100,
+                                  height: 100,
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    color: Colors.white,
                                     shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 20,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
                                   ),
-                                  child: Icon(
-                                    Icons.car_rental,
-                                    size: 64,
-                                    color: Theme.of(context).primaryColor,
+                                  child: ClipOval(
+                                    child: Image.asset(
+                                      'logocir.png',
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 24),

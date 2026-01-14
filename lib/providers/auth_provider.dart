@@ -39,10 +39,31 @@ class AuthProvider extends ChangeNotifier {
       _userProfileSubscription?.cancel();
       _userProfileSubscription = _authService.getUserProfileStream(user.uid).listen((updatedUser) {
         if (updatedUser != null) {
+          // Check for Admin Role
+          if (updatedUser.roles?.isAdmin == true) {
+             _authService.signOut();
+             currentUser = null;
+             // We can't easily throw here as it's a listener, but we can update status to error
+             errorMessage = 'Admins cannot login here.';
+             status = AuthStatus.error;
+             notifyListeners();
+             return;
+          }
           currentUser = updatedUser;
           notifyListeners();
         }
       });
+
+      // Initial check after load
+      // Initial check after load
+      if (currentUser != null && currentUser!.roles?.isAdmin == true) {
+        await _authService.signOut();
+        currentUser = null;
+        errorMessage = 'Admins cannot login here. Please use the Admin Panel.';
+        status = AuthStatus.error;
+        notifyListeners();
+        return;
+      }
 
       status = AuthStatus.idle;
       notifyListeners();
@@ -60,6 +81,8 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String fullName,
     required String phoneNumber,
+    required String city,
+    required String area,
     String? cnicNumber,
     File? cnicFront,
     File? cnicBack,
@@ -75,6 +98,8 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         fullName: fullName,
         phoneNumber: phoneNumber,
+        city: city,
+        area: area,
         cnicNumber: cnicNumber,
         cnicFront: cnicFront,
         cnicBack: cnicBack,
@@ -103,6 +128,13 @@ class AuthProvider extends ChangeNotifier {
 
       if (currentUser == null) {
         throw Exception('User profile not found');
+      }
+
+      // Check for Admin Role
+      if (currentUser != null && currentUser!.roles?.isAdmin == true) {
+        await _authService.signOut();
+        currentUser = null;
+        throw Exception('Admins cannot login here. Please use the Admin Panel.');
       }
 
       status = AuthStatus.idle;

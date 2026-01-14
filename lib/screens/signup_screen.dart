@@ -23,6 +23,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _areaController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
@@ -40,6 +42,8 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _cityController.dispose();
+    _areaController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _cnicNumberController.dispose();
@@ -83,6 +87,8 @@ class _SignupScreenState extends State<SignupScreen> {
         password: _passwordController.text,
         fullName: _nameController.text.trim(),
         phoneNumber: _getFullPhoneNumber(),
+        city: _cityController.text.trim(),
+        area: _areaController.text.trim(),
         cnicNumber: _cnicNumberController.text.trim(),
         cnicFront: _cnicFront,
         cnicBack: _cnicBack,
@@ -201,7 +207,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -258,6 +264,32 @@ class _SignupScreenState extends State<SignupScreen> {
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                           validator: (v) => (v == null || v.length != 10) ? 'Enter 10 digits' : null,
                         ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _cityController,
+                                label: 'City',
+                                hint: 'e.g. Lahore',
+                                prefixIcon: Icons.location_city,
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: CustomTextField(
+                                controller: _areaController,
+                                label: 'Area',
+                                hint: 'e.g. Gulberg',
+                                prefixIcon: Icons.map,
+                                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 16),
 
                         CustomTextField(

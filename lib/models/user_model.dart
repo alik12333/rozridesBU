@@ -49,18 +49,21 @@ class UserModel {
 
 class Roles {
   final bool isOwner;
+  final bool isAdmin; // NEW
 
-  Roles({this.isOwner = false});
+  Roles({this.isOwner = false, this.isAdmin = false}); // NEW
 
   factory Roles.fromMap(Map<String, dynamic> map) {
     return Roles(
       isOwner: map['isOwner'] ?? false,
+      isAdmin: map['isAdmin'] ?? false, // NEW
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'isOwner': isOwner,
+      'isAdmin': isAdmin, // NEW
     };
   }
 }

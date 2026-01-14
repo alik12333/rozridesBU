@@ -28,8 +28,7 @@ class AppTheme {
       onSurface: textPrimary,
       error: errorColor,
       onError: Colors.white,
-      background: backgroundColor,
-      onBackground: textPrimary,
+
     ),
     scaffoldBackgroundColor: backgroundColor,
     

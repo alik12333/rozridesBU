@@ -6,7 +6,8 @@ import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/listing_provider.dart';  // Add this
 import 'screens/login_screen.dart';
-import 'screens/main_navigation.dart';  // We'll create this
+import 'screens/main_navigation.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +31,7 @@ class RozRidesApp extends StatelessWidget {
         title: 'RozRides',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const AuthWrapper(),
+        home: const SplashScreen(nextScreen: AuthWrapper()),
       ),
     );
   }

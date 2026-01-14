@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase-client';
-import { LayoutDashboard, Users, BadgeCheck, Car, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -50,6 +50,7 @@ export default function DashboardLayout({
         { href: '/dashboard/users', label: 'Users', icon: Users },
         { href: '/dashboard/cnic', label: 'CNIC Verification', icon: BadgeCheck },
         { href: '/dashboard/listings', label: 'Car Listings', icon: Car },
+        { href: '/dashboard/add-admin', label: 'Add Admin', icon: ShieldPlus },
     ];
 
     return (
@@ -78,8 +79,8 @@ export default function DashboardLayout({
                             <Link key={item.href} href={item.href}>
                                 <div
                                     className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                                            ? 'bg-primary text-white'
-                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        ? 'bg-primary text-white'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                         }`}
                                 >
                                     <Icon className="w-5 h-5" />

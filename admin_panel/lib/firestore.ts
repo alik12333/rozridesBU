@@ -20,6 +20,7 @@ export interface User {
     roles: {
         isRenter: boolean;
         isOwner: boolean;
+        isAdmin?: boolean;
     };
     fcmToken?: string;
 }

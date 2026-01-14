@@ -90,25 +90,65 @@ class AnimatedListingCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Delete Button (if owner)
-                    if (isOwner && onDelete != null)
+                    // Status Badge & Delete Button (for owner)
+                    if (isOwner)
                       Positioned(
                         top: 12,
                         left: 12,
-                        child: GestureDetector(
-                          onTap: onDelete,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.9),
-                              shape: BoxShape.circle,
+                        child: Row(
+                          children: [
+                            // Status Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(listing.status),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                _getStatusLabel(listing.status),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
+                            
+                            // Delete Button
+                            if (onDelete != null) ...[
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: onDelete,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.9),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],
@@ -203,5 +243,28 @@ class AnimatedListingCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'rejected':
+        return Colors.red;
+      case 'draft':
+        return Colors.blueGrey;
+      case 'inactive':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    if (status.isEmpty) return 'Draft';
+    // Capitalize first letter
+    return status[0].toUpperCase() + status.substring(1);
   }
 }

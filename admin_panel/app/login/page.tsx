@@ -22,7 +22,42 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+            // Allow initial admin setup or check claims
+            // For now, we fetch the user profile to check the role
+            // TODO: In production, custom claims are better, but this works for now
+            // We need to fetch the document from Firestore Client side
+            // Ideally we should use a server action or custom claim, but let's read the doc
+
+            // Note: We can't use the admin SDK here (client side). 
+            // We need to read the user document. 
+            // Assuming the security rules allow a user to read their own document.
+
+            // To be safe and simple, we are adding a check here. 
+            // However, `signInWithEmailAndPassword` is successful at this point.
+            // If we want to blocking non-admins, we might need a blocking function (Cloud Functions) 
+            // or just logout immediately.
+
+            // Let's do the client-side check.
+            const { doc, getDoc } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase-client');
+
+            const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                if (!userData?.roles?.isAdmin) {
+                    await auth.signOut();
+                    throw new Error('Access Denied: You do not have administrator privileges.');
+                }
+            } else {
+                // Handle edge case where user exists in Auth but not in Firestore (e.g. manually created in console without doc)
+                // For safety, deny.
+                await auth.signOut();
+                throw new Error('Access Denied: User profile not found.');
+            }
+
             router.push('/dashboard');
         } catch (err: any) {
             setError(err.message || 'Invalid credentials');
