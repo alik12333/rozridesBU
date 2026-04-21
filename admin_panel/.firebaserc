@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "rozrides-789f0"
-  }
+    "default": "rozrides-v2"
+  },
+  "targets": {},
+  "etags": {}
 }

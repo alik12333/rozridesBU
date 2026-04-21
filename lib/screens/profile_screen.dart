@@ -7,6 +7,8 @@ import '../providers/auth_provider.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import 'login_screen.dart';
+import 'my_listings_screen.dart';
+import 'host/incoming_requests_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -221,12 +223,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             child: CircleAvatar(
                               radius: 50,
+                              backgroundColor: Colors.grey[200],
                               backgroundImage: _profileImage != null
                                   ? FileImage(_profileImage!)
                                   : (user.profilePhoto != null
-                                      ? NetworkImage(user.profilePhoto!)
-                                      : const AssetImage('assets/avatar_placeholder.png'))
-                                          as ImageProvider,
+                                      ? NetworkImage(user.profilePhoto!) as ImageProvider
+                                      : null),
+                              child: (_profileImage == null && user.profilePhoto == null)
+                                  ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                                  : null,
                             ),
                           ),
                           Positioned(
@@ -271,6 +276,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Host Shortcuts (Temporarily ignoring isOwner check for testing)
+                  Text(
+                    'Host Shortcuts',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildMenuTile(
+                    context: context,
+                    icon: Icons.directions_car_rounded,
+                    label: 'My Listed Cars',
+                    subtitle: 'View, edit or remove your car listings',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MyListingsScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildMenuTile(
+                    context: context,
+                    icon: Icons.inbox_rounded,
+                    label: 'Incoming Requests',
+                    subtitle: 'View and manage booking requests',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const IncomingRequestsScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Divider(),
+                  const SizedBox(height: 24),
+
                   // Contact Information
                   Text(
                     'Contact Information',
@@ -571,6 +611,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMenuTile({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                  size: 22, color: Theme.of(context).primaryColor),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 15, color: Colors.grey.shade400),
+          ],
+        ),
       ),
     );
   }

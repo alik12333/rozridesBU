@@ -33,6 +33,13 @@ class ListingModel {
   // Location
   final String? city;
   final String? area;
+  final GeoPoint? location;
+  final String? geohash;
+  final String? locationLabel;
+  final bool isPickupFlexible;
+
+  // Bookings
+  final List<Map<String, dynamic>> bookedDateRanges;
 
   ListingModel({
     required this.id,
@@ -57,6 +64,11 @@ class ListingModel {
     required this.updatedAt,
     this.city,
     this.area,
+    this.location,
+    this.geohash,
+    this.locationLabel,
+    this.isPickupFlexible = false,
+    this.bookedDateRanges = const [],
   });
 
   factory ListingModel.fromMap(Map<String, dynamic> map, String id) {
@@ -83,6 +95,13 @@ class ListingModel {
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       city: map['city'],
       area: map['area'],
+      location: map['location'] as GeoPoint?,
+      geohash: map['geohash'],
+      locationLabel: map['locationLabel'],
+      isPickupFlexible: map['isPickupFlexible'] ?? false,
+      bookedDateRanges: map['bookedDateRanges'] != null
+          ? List<Map<String, dynamic>>.from(map['bookedDateRanges'])
+          : [],
     );
   }
 
@@ -109,6 +128,11 @@ class ListingModel {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'city': city,
       'area': area,
+      'location': location,
+      'geohash': geohash,
+      'locationLabel': locationLabel,
+      'isPickupFlexible': isPickupFlexible,
+      'bookedDateRanges': bookedDateRanges,
     };
   }
 }

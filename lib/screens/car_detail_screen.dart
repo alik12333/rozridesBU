@@ -1,6 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import '../models/listing_model.dart';
+import '../models/pricing_breakdown_model.dart';
+import '../providers/auth_provider.dart';
+import '../widgets/availability_calendar.dart';
+import '../utils/pricing_calculator.dart';
+import 'booking/booking_summary_screen.dart';
 
 class CarDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -13,6 +19,27 @@ class CarDetailScreen extends StatefulWidget {
 
 class _CarDetailScreenState extends State<CarDetailScreen> {
   int _currentImageIndex = 0;
+  DateTime? _selectedStart;
+  DateTime? _selectedEnd;
+  CashPricingBreakdown? _pricingEstimate;
+
+  void _updatePricing() {
+    if (_selectedStart != null && _selectedEnd != null) {
+      try {
+        final estimate = PricingCalculator.calculate(
+          startDate: _selectedStart!,
+          endDate: _selectedEnd!,
+          pricePerDay: widget.listing.pricePerDay,
+          securityDeposit: 10000.0, // Fixed PKR 10k standard deposit for MVP based on PDF
+        );
+        setState(() { _pricingEstimate = estimate; });
+      } catch (e) {
+        setState(() { _pricingEstimate = null; });
+      }
+    } else {
+      setState(() { _pricingEstimate = null; });
+    }
+  }
 
   Future<void> _callOwner() async {
     final phoneNumber = widget.listing.ownerPhone;
@@ -116,12 +143,47 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                         ),
                       ),
                       const Text(
-                        'per day',
+                        'Rental Price Per Day',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.shield_outlined, size: 18, color: Colors.green.shade700),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Security Deposit: PKR 10,000',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.money, size: 16, color: Colors.green),
+                            SizedBox(width: 8),
+                            Text(
+                              'All payments are CASH paid directly to host',
+                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      )
                     ],
                   ),
                 ),
@@ -268,9 +330,110 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                         const SizedBox(height: 24),
                       ],
 
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Availability',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AvailabilityCalendar(
+                        bookedDateRanges: widget.listing.bookedDateRanges,
+                        onRangeSelected: (start, end) {
+                          setState(() {
+                            _selectedStart = start;
+                            _selectedEnd = end;
+                          });
+                          _updatePricing();
+                        },
+                      ),
+
+                      // Trip Estimate Section
+                      if (_pricingEstimate != null) ...[
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Trip Estimate',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${_pricingEstimate!.totalDays} days x PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16)),
+                                  Text('PKR ${_pricingEstimate!.totalRent.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Security deposit (at pickup)', style: TextStyle(fontSize: 16)),
+                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Bring to pickup (Cash)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 32),
+                      const Text(
+                        'How Cash Works',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildTimelineStep('1', 'Pay deposit at pickup', 'Hand over cash keys and sign the agreement.'),
+                            _buildTimelineStep('2', 'Take the car', 'Enjoy your ride safely.'),
+                            _buildTimelineStep('3', 'Return car at end of trip', 'Meet the host again to complete the trip.'),
+                            _buildTimelineStep('4', 'Pay rent, get deposit back', 'Host inspects car. You pay rent, host refunds deposit.'),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 24),
+
                       // Owner Info
                       const Text(
-                        'Owner Information',
+                        'Host Information',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -310,6 +473,14 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                                       color: Colors.grey.shade600,
                                     ),
                                   ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.verified, size: 16, color: Colors.green),
+                                      const SizedBox(width: 4),
+                                      Text('Verified Host', style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ],
+                                  )
                                 ],
                               ),
                             ),
@@ -327,7 +498,6 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
         ],
       ),
 
-      // Call Owner Button
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -344,16 +514,42 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
           child: SizedBox(
             height: 50,
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _callOwner,
-              icon: const Icon(Icons.phone),
-              label: const Text(
-                'Call Owner',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+            child: ElevatedButton(
+              onPressed: (_selectedStart != null && _selectedEnd != null) ? () {
+                final user = context.read<AuthProvider>().currentUser;
+                if (user == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please login to book.')),
+                  );
+                  return;
+                }
+                if (user.id == widget.listing.ownerId) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You cannot book your own car.')),
+                  );
+                  return;
+                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => BookingSummaryScreen(
+                      listing: widget.listing,
+                      startDate: _selectedStart!,
+                      endDate: _selectedEnd!,
+                      pricing: _pricingEstimate!,
+                    ),
+                  ),
+                );
+              } : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: Theme.of(context).primaryColor,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+              ),
+              child: Text(
+                (_selectedStart != null && _selectedEnd != null && _pricingEstimate != null)
+                  ? 'REQUEST TO BOOK - PKR ${_pricingEstimate!.netCostToRenter.toStringAsFixed(0)} total'
+                  : 'Select Dates to Continue',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -362,6 +558,10 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// Helper Widgets
+// -----------------------------------------------------------------------------
 
 class _SpecRow extends StatelessWidget {
   final IconData icon;
@@ -442,4 +642,36 @@ class _FeatureChip extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _buildTimelineStep(String number, String title, String subtitle) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: Color(0xFF7C3AED),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(number, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+            ],
+          ),
+        )
+      ],
+    ),
+  );
 }

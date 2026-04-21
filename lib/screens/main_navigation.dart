@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/booking_provider.dart';
+import '../models/user_model.dart';
 import 'home_screen.dart';
-import 'my_listings_screen.dart';
+import 'host/incoming_requests_screen.dart';
+import 'renter/my_bookings_screen.dart';
 import 'add_listing_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
@@ -21,49 +26,90 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    // We'll handle stream setup in build/didChangeDependencies to be reactive
   }
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const MyListingsScreen(),
-    const AddListingScreen(),
-    const NotificationsScreen(),
-    const ProfileScreen(),
-  ];
+  void _setupBookingStreams(UserModel? user) {
+    if (user == null) return;
+    
+    final provider = context.read<BookingProvider>();
+    // Always listen to both so a user can act as both host and renter seamlessly
+    provider.listenToHostBookings(user.id);
+    provider.listenToRenterBookings(user.id);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().currentUser;
+    
+    // Reactively setup streams when user becomes available
+    if (user != null) {
+      _setupBookingStreams(user);
+    }
+
+    final isHost = user?.roles?.isOwner == true;
+
+    // Smart bookings tab: hosts see incoming requests, renters see my bookings
+    final Widget bookingsTab = isHost
+        ? const IncomingRequestsScreen()
+        : const MyBookingsScreen();
+
+    final screens = [
+      const HomeScreen(),
+      bookingsTab,
+      const AddListingScreen(),
+      const NotificationsScreen(),
+      const ProfileScreen(),
+    ];
+
+    // Badge count for bookings tab (pending requests for hosts)
+    final pendingCount = isHost
+        ? context.watch<BookingProvider>().hostPendingBookings.length
+        : 0;
+
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.directions_car_outlined),
-            selectedIcon: Icon(Icons.directions_car),
-            label: 'My Cars',
+            icon: pendingCount > 0
+                ? Badge(
+                    label: Text('$pendingCount'),
+                    child: Icon(isHost
+                        ? Icons.inbox_outlined
+                        : Icons.bookmark_border_outlined),
+                  )
+                : Icon(isHost
+                    ? Icons.inbox_outlined
+                    : Icons.bookmark_border_outlined),
+            selectedIcon: Icon(isHost
+                ? Icons.inbox_rounded
+                : Icons.bookmark_rounded),
+            label: isHost ? 'Requests' : 'Bookings',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.add_circle_outline, size: 32),
             selectedIcon: Icon(Icons.add_circle, size: 32),
             label: 'Add Car',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
             label: 'Updates',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',

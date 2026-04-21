@@ -187,3 +187,149 @@ export async function getDashboardStats() {
         };
     }
 }
+
+// ──────────────────────── BOOKINGS & TIMELINE ─────────────────────────────
+
+export interface BookingTimelineEvent {
+    id: string;
+    status: string;
+    note: string;
+    triggeredBy: string;
+    timestamp: Date;
+}
+
+export interface Booking {
+    id: string;
+    carId: string;
+    hostId: string;
+    renterId: string;
+    renterName: string;
+    carName: string;
+    startDate: Date;
+    endDate: Date;
+    totalDays: number;
+    pricePerDay: number;
+    totalAmount: number;
+    securityDeposit: number;
+    status: 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled' | 'rejected' | 'expired' | 'disputed';
+    cancellationReason?: string;
+    declineReason?: string;
+    createdAt: Date;
+    updatedAt: Date;
+    expiresAt: Date;
+    // Loaded artificially in the query hook for UI display
+    hostName?: string;
+}
+
+// Fetch all bookings
+export async function getAllBookings(): Promise<Booking[]> {
+    try {
+        const snapshot = await adminDb.collection('bookings').orderBy('createdAt', 'desc').get();
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                startDate: data.startDate?.toDate() || new Date(),
+                endDate: data.endDate?.toDate() || new Date(),
+                createdAt: data.createdAt?.toDate() || new Date(),
+                updatedAt: data.updatedAt?.toDate() || new Date(),
+                expiresAt: data.expiresAt?.toDate() || new Date(),
+            };
+        }) as Booking[];
+    } catch (error) {
+        console.error('Error fetching bookings:', error);
+        return [];
+    }
+}
+
+// Fetch timeline events for a specific booking
+export async function getBookingTimeline(bookingId: string): Promise<BookingTimelineEvent[]> {
+    try {
+        const snapshot = await adminDb
+            .collection('bookings')
+            .doc(bookingId)
+            .collection('timeline')
+            .orderBy('timestamp', 'desc')
+            .get();
+            
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                timestamp: data.timestamp?.toDate() || new Date(),
+            };
+        }) as BookingTimelineEvent[];
+    } catch (error) {
+        console.error(`Error fetching timeline for booking ${bookingId}:`, error);
+        return [];
+    }
+}
+
+// Admin: Force-cancel a booking
+export async function forceCancelBooking(bookingId: string, reason: string): Promise<void> {
+    const bookingRef = adminDb.collection('bookings').doc(bookingId);
+    const doc = await bookingRef.get();
+    if (!doc.exists) throw new Error('Booking not found');
+    const booking = doc.data();
+    
+    const batch = adminDb.batch();
+
+    // 1. Update Booking
+    batch.update(bookingRef, {
+        status: 'cancelled',
+        cancellationReason: `[ADMIN] ${reason}`,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 2. Timeline string
+    const timelineRef = bookingRef.collection('timeline').doc();
+    batch.set(timelineRef, {
+        status: 'cancelled',
+        note: `Admin force-cancelled booking. Reason: ${reason}`,
+        triggeredBy: 'admin',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    // 3. Optional: Add a notification for host and renter
+    if (booking?.hostId) {
+        await addNotification(booking.hostId, {
+            title: 'Booking Force-Cancelled',
+            message: `Admin cancelled the booking for ${booking.carName}. Reason: ${reason}`,
+            type: 'error'
+        });
+    }
+    if (booking?.renterId) {
+         await addNotification(booking.renterId, {
+            title: 'Booking Force-Cancelled',
+            message: `Admin cancelled your booking for ${booking.carName}. Reason: ${reason}`,
+            type: 'error'
+        });
+    }
+}
+
+// Admin: Mark booking as disputed
+export async function markBookingDisputed(bookingId: string): Promise<void> {
+     const bookingRef = adminDb.collection('bookings').doc(bookingId);
+    
+    const batch = adminDb.batch();
+
+    batch.update(bookingRef, {
+        status: 'disputed',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const timelineRef = bookingRef.collection('timeline').doc();
+    batch.set(timelineRef, {
+        status: 'disputed',
+        note: `Admin marked this booking as Disputed for investigation.`,
+        triggeredBy: 'admin',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+}
+

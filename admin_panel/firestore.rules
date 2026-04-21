@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -12,85 +11,51 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    function isVerifiedUser() {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isAuthenticated() && 
-             exists(userPath) && 
-             get(userPath).data.cnic != null &&
-             get(userPath).data.cnic.verificationStatus == 'approved';
-    }
-    
-    // Users collection
     match /users/{userId} {
-      // Anyone authenticated can read user data
       allow read: if isAuthenticated();
-      
-      // Users can update their own profile
       allow update: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Only admins can update CNIC verification status
-      allow update: if isAdmin() && 
-                      request.resource.data.diff(resource.data).affectedKeys()
-                      .hasOnly(['cnic', 'updatedAt']);
-      
-      // Users can create their own profile
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      
-      // Only admins can delete users
       allow delete: if isAdmin();
       
-      // Notifications subcollection
       match /notifications/{notificationId} {
-        // Users can read their own notifications
         allow read: if isAuthenticated() && request.auth.uid == userId;
-        
-        // Users can create notifications for themselves, admins can create for anyone
-        allow create: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
-        
-        // Users can update/delete their own notifications (e.g., mark as read)
+        allow create: if isAuthenticated();
         allow update, delete: if isAuthenticated() && request.auth.uid == userId;
       }
     }
     
-    // Listings collection
     match /listings/{listingId} {
-      // Anyone authenticated can read approved listings. Owner/Admin can read all.
-      allow read: if isAuthenticated() && 
-                    (resource.data.status == 'approved' || 
-                     resource.data.ownerId == request.auth.uid || 
-                     isAdmin());
-      
-      // Users can create their own listings ONLY if verified
-      allow create: if isAuthenticated() && 
-                      request.resource.data.ownerId == request.auth.uid &&
-                      isVerifiedUser();
-      
-      // Users can update their own listings (but not status)
-      allow update: if isAuthenticated() && 
-                      resource.data.ownerId == request.auth.uid &&
-                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']);
-      
-      // Only admins can update listing status
-      allow update: if isAdmin() && 
-                      request.resource.data.diff(resource.data).affectedKeys()
-                      .hasOnly(['status', 'updatedAt']);
-      
-      // Users can delete their own listings
-      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
-      
-      // Admins can delete any listing
-      allow delete: if isAdmin();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
     
-    // Admins collection (read-only, managed via Firebase Console)
+    match /bookings/{bookingId} {
+      // Relaxed read for debugging but still requires auth
+      // In production, we should ensure queries filter by hostId or renterId
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && request.resource.data.renterId == request.auth.uid;
+                      
+      allow update: if isAuthenticated() && (
+        resource.data.renterId == request.auth.uid || 
+        resource.data.hostId == request.auth.uid || 
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+
+      match /timeline/{eventId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
+    }
+
     match /admins/{adminId} {
       allow read: if isAuthenticated() && request.auth.uid == adminId;
-      allow write: if false; // Only managed via Firebase Console
-    }
-    
-    // Bookings collection (if you add this feature later)
-    match /bookings/{bookingId} {
-      allow read, write: if isAuthenticated();
+      allow write: if false;
     }
   }
 }

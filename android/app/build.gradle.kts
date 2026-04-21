@@ -20,6 +20,7 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
+        freeCompilerArgs = listOf("-Xskip-metadata-version-check")
     }
 
     defaultConfig {
@@ -44,4 +45,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.firebase:firebase-storage:21.0.1")
 }

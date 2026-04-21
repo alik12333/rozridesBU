@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
 import '../models/listing_model.dart';
 
 class ListingService {
@@ -27,6 +28,9 @@ class ListingService {
     required List<File> images,
     String? city,
     String? area,
+    GeoPoint? location,
+    String? geohash,
+    String? locationLabel,
   }) async {
     try {
       // Create document reference to get ID
@@ -38,6 +42,17 @@ class ListingService {
       for (int i = 0; i < images.length; i++) {
         final url = await _uploadImage(listingId, images[i], i);
         imageUrls.add(url);
+      }
+
+      // Build geo sub-document in the format geoflutterfire_plus expects:
+      // { geo: { geopoint: GeoPoint, geohash: "string" } }
+      Map<String, dynamic>? geoData;
+      if (location != null) {
+        final geoPoint = GeoFirePoint(location);
+        geoData = {
+          'geopoint': location,
+          'geohash': geoPoint.geohash,
+        };
       }
 
       // Create listing data
@@ -63,6 +78,12 @@ class ListingService {
         'updatedAt': FieldValue.serverTimestamp(),
         'city': city,
         'area': area,
+        // Flat fields for backward compat display
+        'location': location,
+        'geohash': geohash,
+        'locationLabel': locationLabel,
+        // Nested geo field — geoflutterfire_plus queries against this
+        if (geoData != null) 'geo': geoData,
       };
 
       await docRef.set(listingData);
@@ -159,6 +180,27 @@ class ListingService {
     await _firestore.collection('listings').doc(listingId).update({
       'status': status,
       'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Migrate an existing listing that has flat location/geohash fields
+  /// but is missing the nested 'geo' field required by geoflutterfire_plus.
+  Future<void> migrateListingGeoField(String listingId) async {
+    final doc = await _firestore.collection('listings').doc(listingId).get();
+    if (!doc.exists) return;
+
+    final data = doc.data()!;
+    final GeoPoint? location = data['location'] as GeoPoint?;
+    if (location == null) return;
+    if (data['geo'] != null) return; // Already migrated
+
+    final geoPoint = GeoFirePoint(location);
+    await _firestore.collection('listings').doc(listingId).update({
+      'geo': {
+        'geopoint': location,
+        'geohash': geoPoint.geohash,
+      },
+      'geohash': geoPoint.geohash, // Keep flat field in sync too
     });
   }
 }

@@ -8,6 +8,9 @@ import '../providers/listing_provider.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import 'listing_success_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'host/location_picker_screen.dart';
 
 class AddListingScreen extends StatefulWidget {
   const AddListingScreen({super.key});
@@ -36,6 +39,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool _hasInsurance = false;
   List<File> _images = [];
   bool _isSubmitting = false;
+  LocationPickerResult? _locationResult;
 
   final List<String> _fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'CNG'];
   final List<String> _transmissions = ['Manual', 'Automatic'];
@@ -118,6 +122,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    if (_locationResult == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select the car location on the map'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final authProvider = context.read<AuthProvider>();
     final listingProvider = context.read<ListingProvider>();
     final user = authProvider.currentUser;
@@ -176,8 +190,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
         withDriver: _withDriver,
         hasInsurance: _hasInsurance,
         images: _images,
-        city: user.location?.city,
-        area: user.location?.area,
+        city: _locationResult!.city ?? user.location?.city,
+        area: _locationResult!.area ?? user.location?.area,
+        location: GeoPoint(_locationResult!.latLng.latitude, _locationResult!.latLng.longitude),
+        geohash: null, // Computed by ListingService from the GeoPoint
+        locationLabel: _locationResult!.locationLabel,
       );
 
       // Close loading dialog
@@ -699,50 +716,87 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
               const SizedBox(height: 16),
 
-              // Insurance Toggle
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Has Insurance',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+              // Insurance Option Cards (Phase 2 requirement)
+              const Text(
+                'Does your car have valid insurance?',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _hasInsurance = true),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _hasInsurance ? Colors.green : Colors.grey.shade300,
+                            width: _hasInsurance ? 2 : 1,
                           ),
+                          color: _hasInsurance ? Colors.green.shade50 : Colors.white,
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Vehicle has active insurance',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                        child: Column(
+                          children: [
+                            Icon(Icons.shield_outlined,
+                                color: _hasInsurance ? Colors.green : Colors.grey,
+                                size: 28),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Yes — Car is insured',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _hasInsurance ? Colors.green.shade800 : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _hasInsurance = false;
+                        _withDriver = true; // Force driver if no insurance
+                      }),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: !_hasInsurance ? Colors.orange : Colors.grey.shade300,
+                            width: !_hasInsurance ? 2 : 1,
                           ),
+                          color: !_hasInsurance ? Colors.orange.shade50 : Colors.white,
                         ),
-                      ],
+                        child: Column(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: !_hasInsurance ? Colors.orange : Colors.grey,
+                                size: 28),
+                            const SizedBox(height: 6),
+                            Text(
+                              'No — Car is not insured',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: !_hasInsurance ? Colors.orange.shade800 : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    Switch(
-                      value: _hasInsurance,
-                      onChanged: (value) {
-                        setState(() {
-                          _hasInsurance = value;
-                          // If insurance is turned off, force withDriver to true
-                          if (!value) {
-                            _withDriver = true;
-                          }
-                        });
-                      },
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
 
               if (!_hasInsurance)
@@ -761,10 +815,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         Expanded(
                           child: Text(
                             'Without insurance, driver must be included',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                            ),
+                            style: TextStyle(fontSize: 12, color: Colors.orange),
                           ),
                         ),
                       ],
@@ -801,6 +852,67 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   }
                   return null;
                 },
+              ),
+
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
+
+              // Location Picker
+              const Text(
+                'Location',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Pin exactly where this car is available for pickup',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final LocationPickerResult? result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LocationPickerScreen(),
+                    ),
+                  );
+                  if (result != null) {
+                    setState(() {
+                      _locationResult = result;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _locationResult == null ? Colors.red.shade300 : Colors.green.shade500),
+                    borderRadius: BorderRadius.circular(8),
+                    color: _locationResult == null ? Colors.red.shade50 : Colors.green.shade50,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _locationResult == null ? Icons.location_off : Icons.location_on,
+                        color: _locationResult == null ? Colors.red : Colors.green,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _locationResult == null
+                            ? 'Tap to pick car location (Required)'
+                            : _locationResult!.locationLabel,
+                          style: TextStyle(
+                            color: _locationResult == null ? Colors.red.shade700 : Colors.green.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: _locationResult == null ? Colors.red : Colors.green),
+                    ],
+                  ),
+                ),
               ),
 
               const SizedBox(height: 32),

@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -50,19 +47,30 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyASb9cJ1oxoWA8plIV-C_3XthRiHPdYDnU',
-    appId: '1:999366529921:android:1eb55bc31f3cb0da2b8e80',
-    messagingSenderId: '999366529921',
-    projectId: 'rozrides-789f0',
-    storageBucket: 'rozrides-789f0.firebasestorage.app',
+    apiKey: 'AIzaSyDBlmN9pyDr-V-wUph2HZADvGr7P--wdcg',
+    appId: '1:82662468366:android:ea4ae103ad89756891055f',
+    messagingSenderId: '82662468366',
+    projectId: 'rozrides-v2',
+    storageBucket: 'rozrides-v2.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA6yBIobcG7VpJPqbHn03w5PxyfHeW9Ox4',
-    appId: '1:999366529921:ios:b3a9c6e8011b8a552b8e80',
-    messagingSenderId: '999366529921',
-    projectId: 'rozrides-789f0',
-    storageBucket: 'rozrides-789f0.firebasestorage.app',
+    apiKey: 'AIzaSyBbEYb5Z3PL6DpHqUAclRv8f4PmUD_QpPw',
+    appId: '1:82662468366:ios:16fd0d9c8b3b0c9091055f',
+    messagingSenderId: '82662468366',
+    projectId: 'rozrides-v2',
+    storageBucket: 'rozrides-v2.firebasestorage.app',
     iosBundleId: 'com.example.rozrides',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAUx6soVEBrec21d_2hooM8vi120q5Mymc',
+    appId: '1:82662468366:web:ac61837fb345621f91055f',
+    messagingSenderId: '82662468366',
+    projectId: 'rozrides-v2',
+    authDomain: 'rozrides-v2.firebaseapp.com',
+    storageBucket: 'rozrides-v2.firebasestorage.app',
+    measurementId: 'G-EJ71XWV787',
+  );
+
 }

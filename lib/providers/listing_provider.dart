@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/listing_model.dart';
 import '../services/listing_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ListingStatus { idle, loading, error, success }
 
@@ -36,6 +37,9 @@ class ListingProvider extends ChangeNotifier {
     required List<File> images,
     String? city,
     String? area,
+    GeoPoint? location,
+    String? geohash,
+    String? locationLabel,
   }) async {
     try {
       status = ListingStatus.loading;
@@ -61,6 +65,9 @@ class ListingProvider extends ChangeNotifier {
         images: images,
         city: city,
         area: area,
+        location: location,
+        geohash: geohash,
+        locationLabel: locationLabel,
       );
 
       status = ListingStatus.success;

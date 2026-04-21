@@ -4,9 +4,10 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
-import 'providers/listing_provider.dart';  // Add this
+import 'providers/listing_provider.dart';
+import 'providers/booking_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/main_navigation.dart';
+import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
@@ -25,7 +26,8 @@ class RozRidesApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => ListingProvider()),  // Add this
+        ChangeNotifierProvider(create: (_) => ListingProvider()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
       ],
       child: MaterialApp(
         title: 'RozRides',
@@ -53,7 +55,7 @@ class AuthWrapper extends StatelessWidget {
 
     // If user exists
     if (authProvider.currentUser != null) {
-      return const MainNavigation();   // Updated
+      return const HomeScreen();
     }
 
     // Default: show login
