@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/booking_model.dart';
 import '../models/inspection_model.dart';
+import '../models/post_inspection_model.dart';
 import '../models/pricing_breakdown_model.dart';
 
 class BookingService {
@@ -760,6 +761,173 @@ class BookingService {
     } catch (_) {}
   }
 
+  // ──────────────────────── COMPLETE TRIP ─────────────────────────────────
+
+  Future<void> completeTrip({
+    required String bookingId,
+    required String carId,
+    required PostTripInspection postInspection,
+    required CashSettlement settlement,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final hostId = currentUser.uid;
+
+    // 1. Upload post-trip photos
+    final updatedItems = <String, InspectionItem>{};
+    for (final entry in postInspection.items.entries) {
+      final area = entry.key;
+      final item = entry.value;
+      final uploadedUrls = <String>[];
+      for (int i = 0; i < item.photoUrls.length; i++) {
+        final path = item.photoUrls[i];
+        if (path.startsWith('http')) {
+          uploadedUrls.add(path);
+          continue;
+        }
+        try {
+          final file = File(path);
+          final ts = DateTime.now().millisecondsSinceEpoch;
+          final ref = FirebaseStorage.instance
+              .ref('inspections/$bookingId/post_trip/${area}_$ts.jpg');
+          await ref.putFile(file);
+          uploadedUrls.add(await ref.getDownloadURL());
+        } catch (_) {
+          uploadedUrls.add(path);
+        }
+      }
+      updatedItems[area] = item.copyWith(photoUrls: uploadedUrls);
+    }
+
+    final finalPost = postInspection.copyWith(
+        items: updatedItems, completedAt: DateTime.now());
+
+    // 2. Fetch booking metadata
+    final bookingSnap =
+        await _firestore.collection('bookings').doc(bookingId).get();
+    if (!bookingSnap.exists) throw Exception('Booking not found');
+    final data = bookingSnap.data()!;
+    final renterId = data['renterId'] as String? ?? '';
+    final carName  = data['carName']  as String? ?? '';
+
+    final batch = _firestore.batch();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+
+    // 3. Update booking to completed
+    batch.update(bookingRef, {
+      'status': 'completed',
+      'tripEndedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'cashPayments.rentPaidToHost': true,
+      'cashPayments.rentPaidAmount': settlement.rentPaid,
+      'cashPayments.rentPaidAt': FieldValue.serverTimestamp(),
+      'cashPayments.depositRefundedToRenter': true,
+      'cashPayments.depositRefundedAmount': settlement.depositRefunded,
+      'cashPayments.depositRefundedAt': FieldValue.serverTimestamp(),
+      'cashPayments.damageDeduction': settlement.damageDeduction,
+    });
+
+    // 4. Write post-trip inspection
+    final postRef = bookingRef.collection('inspections').doc('post_trip');
+    batch.set(postRef, finalPost.toMap());
+
+    // 5. Remove from car's bookedDateRanges
+    final startDate = (data['startDate'] as Timestamp).toDate();
+    final endDate   = (data['endDate']   as Timestamp).toDate();
+    final carRef = _firestore.collection('listings').doc(carId);
+    batch.update(carRef, {
+      'bookedDateRanges': FieldValue.arrayRemove([
+        {
+          'start': Timestamp.fromDate(startDate),
+          'end':   Timestamp.fromDate(endDate),
+          'bookingId': bookingId,
+        }
+      ]),
+    });
+
+    // 6. Timeline event
+    _addTimelineEvent(
+      batch,
+      bookingId,
+      'completed',
+      'Trip completed. Rent PKR ${settlement.rentPaid.toStringAsFixed(0)} collected. '
+      'Deposit PKR ${settlement.depositRefunded.toStringAsFixed(0)} refunded. '
+      'Damage deduction: PKR ${settlement.damageDeduction.toStringAsFixed(0)}.',
+      hostId,
+    );
+
+    // Commit main trip updates first
+    await batch.commit();
+
+    // 7. Scheduled review notifications (sendAt = now + 2h)
+    // Put these in a separate try-catch so permission errors don't block trip completion
+    try {
+      final notifBatch = _firestore.batch();
+      final sendAt = Timestamp.fromDate(DateTime.now().add(const Duration(hours: 2)));
+
+      if (renterId.isNotEmpty) {
+        final renterNotifSched = _firestore.collection('scheduledNotifications').doc();
+        notifBatch.set(renterNotifSched, {
+          'targetUserId': renterId,
+          'type': 'review_prompt',
+          'title': 'How was your trip? ⭐',
+          'body': 'Rate $carName and your host to help the RozRides community.',
+          'bookingId': bookingId,
+          'sendAt': sendAt,
+          'sent': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      final hostNotifSched = _firestore.collection('scheduledNotifications').doc();
+      notifBatch.set(hostNotifSched, {
+        'targetUserId': hostId,
+        'type': 'review_prompt',
+        'title': 'Leave a review ⭐',
+        'body': 'How was ${data['renterName'] ?? 'the renter'} as a renter? Leave a review to help other hosts.',
+        'bookingId': bookingId,
+        'sendAt': sendAt,
+        'sent': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await notifBatch.commit();
+    } catch (_) {
+      // Ignore notification schedule failure (usually due to missing Firestore rules)
+    }
+
+    // 8. System message in conversation (best-effort)
+    try {
+      await _firestore
+          .collection('conversations')
+          .doc(bookingId)
+          .collection('messages')
+          .add({
+        'type': 'system',
+        'text': '✅ Trip completed on ${_fmt(DateTime.now())}. '
+            'All cash settled. Thanks for using RozRides!',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  // ─────────────────── STREAM PRE-TRIP INSPECTION ─────────────────────────
+
+  Future<PreTripInspection?> fetchPreTripInspection(String bookingId) async {
+    try {
+      final doc = await _firestore
+          .collection('bookings')
+          .doc(bookingId)
+          .collection('inspections')
+          .doc('pre_trip')
+          .get();
+      if (!doc.exists) return null;
+      return PreTripInspection.fromMap(doc.data()!);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ────────────────────────── UTILITIES ───────────────────────────────────
 
   String _fmt(DateTime d) =>
@@ -770,3 +938,4 @@ class BookingService {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 }
+

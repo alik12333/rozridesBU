@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../utils/booking_status_utils.dart';
 import '../trip/active_trip_screen.dart';
+import '../trip/post_trip_inspection_screen.dart';
 import '../trip/pre_trip_inspection_screen.dart';
 import 'cancellation_screen.dart';
 
@@ -45,6 +46,32 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
       if (mounted && doc.exists) setState(() => _otherPartyData = doc.data());
     } catch (_) {}
+  }
+
+  Future<void> _navigateToReturn(BuildContext context, BookingModel booking) async {
+    final snack = ScaffoldMessenger.of(context);
+    snack.showSnackBar(const SnackBar(
+      content: Text('Loading inspection data…'),
+      duration: Duration(seconds: 2),
+    ));
+    final pre = await _service.fetchPreTripInspection(booking.id);
+    if (!context.mounted) return;
+    if (pre == null) {
+      snack.showSnackBar(const SnackBar(
+        content: Text('Pre-trip inspection not found. Cannot start return.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostTripInspectionScreen(
+          booking: booking,
+          preInspection: pre,
+        ),
+      ),
+    );
   }
 
   String _fmt(DateTime d) => DateFormat('MMM d, yyyy').format(d);
@@ -377,8 +404,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         buttons.add(_actionBtn(
           label: 'Complete Return',
           color: Colors.blue.shade700,
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Return flow coming in Phase 7'))),
+          onPressed: () => _navigateToReturn(context, booking),
         ));
       }
     } else {

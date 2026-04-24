@@ -1,0 +1,478 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../models/booking_model.dart';
+import '../../models/inspection_model.dart';
+import '../../models/post_inspection_model.dart';
+import '../../services/booking_service.dart';
+
+class CashSettlementScreen extends StatefulWidget {
+  final BookingModel booking;
+  final ComparisonResult comparison;
+  final PostTripInspection postInspection;
+
+  const CashSettlementScreen({
+    super.key,
+    required this.booking,
+    required this.comparison,
+    required this.postInspection,
+  });
+
+  @override
+  State<CashSettlementScreen> createState() => _CashSettlementScreenState();
+}
+
+class _CashSettlementScreenState extends State<CashSettlementScreen> {
+  final BookingService _service = BookingService();
+  final TextEditingController _deductionCtrl = TextEditingController(text: '0');
+
+  bool _rentConfirmed = false;
+  bool _depositConfirmed = false;
+  bool _renterAgreesToDeduction = false;
+  bool _submitting = false;
+
+  double get _deduction =>
+      double.tryParse(_deductionCtrl.text) ?? 0;
+  double get _depositRefund =>
+      (widget.booking.securityDeposit - _deduction).clamp(0, widget.booking.securityDeposit);
+
+  String _pkr(double v) => 'PKR ${v.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}';
+
+  Future<void> _closeTrip() async {
+    setState(() => _submitting = true);
+    try {
+      final settlement = CashSettlement(
+        rentPaid: widget.booking.totalRent,
+        depositRefunded: _depositRefund,
+        damageDeduction: _deduction,
+      );
+      await _service.completeTrip(
+        bookingId: widget.booking.id,
+        carId: widget.booking.carId,
+        postInspection: widget.postInspection,
+        settlement: settlement,
+      );
+      if (mounted) {
+        Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == '/');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ Trip completed! Thanks for using RozRides.'),
+          backgroundColor: Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  Widget _card({required Widget child, Color? color}) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: color ?? Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 3))
+          ],
+        ),
+        child: child,
+      );
+
+  Widget _stepCard({
+    required int step,
+    required String label,
+    required String amount,
+    required String subtitle,
+    required bool checked,
+    required VoidCallback onChanged,
+  }) {
+    return _card(
+      color: checked ? Colors.green.shade50 : Colors.white,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Step indicator
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: checked ? Colors.green.shade600 : const Color(0xFF7C3AED),
+          ),
+          child: Center(
+            child: checked
+                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                : Text('$step',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16)),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: GoogleFonts.outfit(
+                    fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 2),
+            Text(amount,
+                style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF7C3AED))),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                style:
+                    TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: onChanged,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: checked ? Colors.green.shade100 : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: checked
+                          ? Colors.green.shade400
+                          : Colors.grey.shade300),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(
+                    checked
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked,
+                    size: 18,
+                    color: checked ? Colors.green.shade600 : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    checked ? 'Confirmed ✓' : 'Tap to confirm',
+                    style: TextStyle(
+                        color: checked
+                            ? Colors.green.shade700
+                            : Colors.grey.shade600,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13),
+                  ),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // ── Scenario A — No new damage ────────────────────────────────────────────
+
+  Widget _scenarioA() {
+    final b = widget.booking;
+    final canClose = _rentConfirmed && _depositConfirmed;
+
+    return Column(children: [
+      _card(
+        color: Colors.green.shade50,
+        child: Row(children: [
+          Icon(Icons.check_circle, color: Colors.green.shade600, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text('No new damage found! Great trip.',
+                  style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700))),
+        ]),
+      ),
+      _stepCard(
+        step: 1,
+        label: 'Renter pays car rental',
+        amount: _pkr(b.totalRent),
+        subtitle: '${b.renterName} pays host cash',
+        checked: _rentConfirmed,
+        onChanged: () => setState(() => _rentConfirmed = !_rentConfirmed),
+      ),
+      _stepCard(
+        step: 2,
+        label: 'Host returns security deposit',
+        amount: _pkr(b.securityDeposit),
+        subtitle: 'Host returns to ${b.renterName}',
+        checked: _depositConfirmed,
+        onChanged: () =>
+            setState(() => _depositConfirmed = !_depositConfirmed),
+      ),
+      const SizedBox(height: 8),
+      _closeTripButton(canClose),
+    ]);
+  }
+
+  // ── Scenario B — Damage found ─────────────────────────────────────────────
+
+  Widget _scenarioB() {
+    final b = widget.booking;
+    final comp = widget.comparison;
+    final canClose = _renterAgreesToDeduction && _rentConfirmed && _depositConfirmed;
+
+    return Column(children: [
+      // Damage summary
+      _card(
+        color: Colors.red.shade50,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 24),
+            const SizedBox(width: 10),
+            Text('Damage Found',
+                style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700)),
+          ]),
+          const SizedBox(height: 10),
+          ...comp.newDamageAreas.map((area) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('• ',
+                      style: TextStyle(
+                          color: Colors.red, fontWeight: FontWeight.bold)),
+                  Expanded(
+                      child: Text(
+                          '${InspectionAreas.label(area)}: ${comp.newDamageNotes[area] ?? "Damage noted"}',
+                          style: const TextStyle(fontSize: 13, height: 1.4))),
+                ]),
+              )),
+          if (comp.hasFuelIssue) ...[
+            const SizedBox(height: 4),
+            const Row(children: [
+              Text('• ',
+                  style: TextStyle(
+                      color: Colors.orange, fontWeight: FontWeight.bold)),
+              Text('Fuel level returned lower than at pickup',
+                  style: TextStyle(fontSize: 13)),
+            ]),
+          ],
+        ]),
+      ),
+
+      // Deduction input (host decides)
+      if (!_renterAgreesToDeduction)
+        _card(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Agree on a deduction amount',
+                style:
+                    GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Security deposit held: ${_pkr(b.securityDeposit)}',
+                style:
+                    TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _deductionCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Deduction for damage (PKR)',
+                prefixIcon: const Icon(Icons.money_off),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Renter receives back:',
+                      style: TextStyle(color: Colors.grey.shade600)),
+                  Text(_pkr(_depositRefund),
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.green.shade700)),
+                ]),
+            const SizedBox(height: 16),
+            // Renter agrees button
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.handshake_outlined),
+                label: Text(
+                    'RENTER AGREES TO ${_pkr(_deduction)} DEDUCTION'),
+                onPressed: _deduction >= 0 && _deduction <= b.securityDeposit
+                    ? () => setState(() => _renterAgreesToDeduction = true)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Dispute stub
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.flag_outlined),
+                label: const Text('RAISE A DISPUTE WITH ROZRIDES'),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
+                      title: const Text('Disputes — Coming Soon'),
+                      content: const Text(
+                          'The dispute resolution feature is a future update. '
+                          'Please contact RozRides support directly at +92-300-ROZRIDE.'),
+                      actions: [
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7C3AED),
+                              foregroundColor: Colors.white),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade600,
+                  side: BorderSide(color: Colors.red.shade300),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ]),
+        ),
+
+      // After renter agrees — show cash confirmation steps
+      if (_renterAgreesToDeduction) ...[
+        _card(
+          color: Colors.green.shade50,
+          child: Row(children: [
+            Icon(Icons.check_circle, color: Colors.green.shade600, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(
+                    'Renter agreed to ${_pkr(_deduction)} deduction. Proceed to cash exchange.',
+                    style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600))),
+          ]),
+        ),
+        _stepCard(
+          step: 1,
+          label: 'Renter pays car rental',
+          amount: _pkr(b.totalRent),
+          subtitle: '${b.renterName} pays host cash',
+          checked: _rentConfirmed,
+          onChanged: () => setState(() => _rentConfirmed = !_rentConfirmed),
+        ),
+        _stepCard(
+          step: 2,
+          label: 'Host returns deposit (after deduction)',
+          amount: _pkr(_depositRefund),
+          subtitle:
+              '${_pkr(b.securityDeposit)} − ${_pkr(_deduction)} deduction',
+          checked: _depositConfirmed,
+          onChanged: () =>
+              setState(() => _depositConfirmed = !_depositConfirmed),
+        ),
+        _closeTripButton(canClose),
+      ],
+    ]);
+  }
+
+  Widget _closeTripButton(bool enabled) {
+    final isHost = FirebaseAuth.instance.currentUser?.uid == widget.booking.hostId;
+
+    if (!isHost) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(children: [
+          Icon(Icons.hourglass_empty, color: Colors.grey.shade500),
+          const SizedBox(height: 8),
+          Text('Waiting for Host to close the trip...',
+              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
+        ]),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: (enabled && !_submitting) ? _closeTrip : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF16A34A),
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade300,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        child: _submitting
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white))
+            : const Text('CLOSE TRIP',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasIssue = widget.comparison.hasAnyIssue;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
+      appBar: AppBar(
+        title: Text(
+          hasIssue ? '⚠ Damage Found — Settle Cash' : '✅ All Clear — Settle Cash',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        child: hasIssue ? _scenarioB() : _scenarioA(),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _deductionCtrl.dispose();
+    super.dispose();
+  }
+}

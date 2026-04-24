@@ -8,6 +8,7 @@ import '../../models/booking_model.dart';
 import '../../models/inspection_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+import 'post_trip_inspection_screen.dart';
 
 class ActiveTripScreen extends StatefulWidget {
   final String bookingId;
@@ -36,6 +37,32 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _navigateToReturn(BuildContext context, BookingModel booking) async {
+    final snack = ScaffoldMessenger.of(context);
+    snack.showSnackBar(const SnackBar(
+      content: Text('Loading inspection data…'),
+      duration: Duration(seconds: 2),
+    ));
+    final pre = await _service.fetchPreTripInspection(booking.id);
+    if (!context.mounted) return;
+    if (pre == null) {
+      snack.showSnackBar(const SnackBar(
+        content: Text('Pre-trip inspection not found.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostTripInspectionScreen(
+          booking: booking,
+          preInspection: pre,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadInspection() async {
@@ -591,20 +618,23 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
               isHost: true, bookingId: booking.id, otherName: booking.renterName),
           const SizedBox(height: 12),
 
-          // Trip info
-          _card(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _sectionTitle('Trip Info'),
-            if (booking.tripStartedAt != null)
-              _infoRow(Icons.play_circle_outline, 'Trip started',
-                  _fmtFull(booking.tripStartedAt!)),
-            if (_inspection != null) ...[
-              _infoRow(Icons.local_gas_station_outlined, 'Fuel at pickup',
-                  _inspection!.fuelLevel),
-              _infoRow(Icons.speed_outlined, 'Odometer at pickup',
-                  '${_inspection!.odometerReading} km'),
-            ],
-          ])),
+          // Complete return button
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.assignment_return_outlined),
+              label: const Text('Complete Return',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: () => _navigateToReturn(context, booking),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
         ]),
       ),
     );

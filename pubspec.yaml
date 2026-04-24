@@ -56,6 +56,7 @@ dependencies:
   geolocator: ^14.0.2
   geoflutterfire_plus: ^0.0.34
   geocoding: ^3.0.0
+  cloud_functions: ^6.2.0
 
 dev_dependencies:
   flutter_test:
