@@ -8,7 +8,7 @@ import '../models/listing_model.dart';
 import 'car_detail_screen.dart';
 import 'search/map_search_screen.dart';
 import 'renter/my_bookings_screen.dart';
-import 'host/incoming_requests_screen.dart';
+import 'host/host_bookings_screen.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'my_listings_screen.dart';
@@ -316,8 +316,8 @@ class _AppDrawer extends StatelessWidget {
                 _sectionLabel('As Host'),
                 _DrawerTile(
                   icon: Icons.inbox_rounded,
-                  label: 'Incoming Requests',
-                  onTap: () => _go(context, const IncomingRequestsScreen()),
+                  label: 'Host Bookings',
+                  onTap: () => _go(context, const HostBookingsScreen()),
                 ),
                 _DrawerTile(
                   icon: Icons.directions_car_outlined,

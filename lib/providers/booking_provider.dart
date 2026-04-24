@@ -10,6 +10,7 @@ class BookingProvider extends ChangeNotifier {
 
   // ─── State ──────────────────────────────────────────────────────────────
   List<BookingModel> _hostPendingBookings = [];
+  List<BookingModel> _hostAllBookings     = [];
   List<BookingModel> _renterBookings      = [];
   BookingActionStatus actionStatus        = BookingActionStatus.idle;
   String? errorMessage;
@@ -17,22 +18,58 @@ class BookingProvider extends ChangeNotifier {
   String? _activeRenterId;
 
   List<BookingModel> get hostPendingBookings => _hostPendingBookings;
+  List<BookingModel> get hostAllBookings     => _hostAllBookings;
   List<BookingModel> get renterBookings      => _renterBookings;
 
-  // Renter bookings grouped by status
-  List<BookingModel> get pendingBookings   =>
+  // ─── Renter bookings grouped by status ──────────────────────────────────
+  List<BookingModel> get pendingBookings =>
       _renterBookings.where((b) => b.status == 'pending').toList();
   List<BookingModel> get confirmedBookings =>
       _renterBookings.where((b) => b.status == 'confirmed').toList();
-  List<BookingModel> get activeBookings    =>
+  List<BookingModel> get activeBookings =>
       _renterBookings.where((b) => b.status == 'active').toList();
   List<BookingModel> get completedBookings =>
       _renterBookings.where((b) => b.status == 'completed').toList();
   List<BookingModel> get cancelledBookings =>
-      _renterBookings.where((b) => b.status == 'cancelled' || b.status == 'rejected' || b.status == 'expired').toList();
+      _renterBookings
+          .where((b) =>
+              b.status == 'cancelled' ||
+              b.status == 'rejected' ||
+              b.status == 'expired')
+          .toList();
+
+  // Renter tab groupings per spec (Upcoming, Active, Past)
+  List<BookingModel> get upcomingBookings =>
+      _renterBookings
+          .where((b) => b.status == 'pending' || b.status == 'confirmed')
+          .toList();
+
+  List<BookingModel> get pastBookings =>
+      _renterBookings
+          .where((b) =>
+              b.status == 'completed' ||
+              b.status == 'cancelled' ||
+              b.status == 'rejected' ||
+              b.status == 'expired')
+          .toList();
+
+  // ─── Host bookings grouped by status ────────────────────────────────────
+  List<BookingModel> get hostConfirmedBookings =>
+      _hostAllBookings.where((b) => b.status == 'confirmed').toList();
+  List<BookingModel> get hostActiveBookings =>
+      _hostAllBookings.where((b) => b.status == 'active').toList();
+  List<BookingModel> get hostPastBookings =>
+      _hostAllBookings
+          .where((b) =>
+              b.status == 'completed' ||
+              b.status == 'cancelled' ||
+              b.status == 'rejected' ||
+              b.status == 'expired')
+          .toList();
 
   // ─── Stream subscriptions ───────────────────────────────────────────────
-  StreamSubscription<List<BookingModel>>? _hostSub;
+  StreamSubscription<List<BookingModel>>? _hostPendingSub;
+  StreamSubscription<List<BookingModel>>? _hostAllSub;
   StreamSubscription<List<BookingModel>>? _renterSub;
 
   // ─── Start listening ─────────────────────────────────────────────────────
@@ -41,16 +78,23 @@ class BookingProvider extends ChangeNotifier {
     if (_activeHostId == hostId) return;
     _activeHostId = hostId;
 
-    _hostSub?.cancel();
-    _hostSub = _service.getHostPendingBookings(hostId).listen((bookings) async {
-      // Lazy expiry: mark any expired pending bookings
+    // Listen to pending bookings (for badge count)
+    _hostPendingSub?.cancel();
+    _hostPendingSub =
+        _service.getPendingRequestsForHost(hostId).listen((bookings) async {
       for (final b in bookings) {
         if (b.isExpired) {
           await _service.expireBooking(b);
         }
       }
-      _hostPendingBookings =
-          bookings.where((b) => !b.isExpired).toList();
+      _hostPendingBookings = bookings.where((b) => !b.isExpired).toList();
+      notifyListeners();
+    });
+
+    // Listen to all host bookings (for HostBookingsScreen)
+    _hostAllSub?.cancel();
+    _hostAllSub = _service.getBookingsForHost(hostId).listen((bookings) {
+      _hostAllBookings = bookings;
       notifyListeners();
     });
   }
@@ -61,7 +105,6 @@ class BookingProvider extends ChangeNotifier {
 
     _renterSub?.cancel();
     _renterSub = _service.getRenterBookings(renterId).listen((bookings) async {
-      // Lazy expiry
       for (final b in bookings) {
         if (b.isExpired) {
           await _service.expireBooking(b);
@@ -73,7 +116,8 @@ class BookingProvider extends ChangeNotifier {
   }
 
   void stopListening() {
-    _hostSub?.cancel();
+    _hostPendingSub?.cancel();
+    _hostAllSub?.cancel();
     _renterSub?.cancel();
     _activeHostId = null;
     _activeRenterId = null;
@@ -81,12 +125,26 @@ class BookingProvider extends ChangeNotifier {
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
-  Future<bool> acceptBooking(BookingModel booking) async {
-    return _runAction(() => _service.acceptBooking(booking));
+  Future<bool> acceptBooking(String bookingId) async {
+    return _runAction(() => _service.acceptBooking(bookingId));
   }
 
   Future<bool> declineBooking(BookingModel booking, String reason) async {
     return _runAction(() => _service.declineBooking(booking, reason));
+  }
+
+  Future<bool> cancelBooking({
+    required String bookingId,
+    required String reason,
+    required String cancelledBy,
+  }) async {
+    return _runAction(
+      () => _service.cancelBooking(
+        bookingId: bookingId,
+        reason: reason,
+        cancelledBy: cancelledBy,
+      ),
+    );
   }
 
   Future<bool> _runAction(Future<void> Function() action) async {
@@ -99,7 +157,7 @@ class BookingProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      errorMessage = e.toString();
+      errorMessage = e.toString().replaceFirst('Exception: ', '');
       actionStatus = BookingActionStatus.error;
       notifyListeners();
       return false;

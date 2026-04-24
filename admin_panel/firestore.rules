@@ -27,7 +27,11 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid || 
+        isAdmin() || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedDateRanges'])
+      );
       allow delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
     
@@ -51,11 +55,40 @@ service cloud.firestore {
         allow create: if isAuthenticated();
         allow update, delete: if isAdmin();
       }
+
+      match /inspections/{inspectionId} {
+        allow read: if isAuthenticated() && (
+          resource.data.bookingId == bookingId ||
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid ||
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid
+        );
+        allow create, update: if isAuthenticated() &&
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid;
+        allow delete: if isAdmin();
+      }
     }
 
     match /admins/{adminId} {
       allow read: if isAuthenticated() && request.auth.uid == adminId;
       allow write: if false;
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin();
+      }
+    }
+    
+    match /admin_alerts/{alertId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if isAuthenticated();
     }
   }
 }
