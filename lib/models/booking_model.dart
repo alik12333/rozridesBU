@@ -110,38 +110,47 @@ class BookingModel {
       'hostSubmitted': false,
     };
 
-    return BookingModel(
-      id: id,
-      carId: map['carId'] ?? '',
-      hostId: map['hostId'] ?? '',
-      renterId: map['renterId'] ?? '',
-      carName: map['carName'] ?? '',
-      carPhoto: map['carPhoto'] ?? '',
-      carLocation: map['carLocation'] ?? '',
-      startDate: (map['startDate'] as Timestamp).toDate(),
-      endDate: (map['endDate'] as Timestamp).toDate(),
-      totalDays: map['totalDays'] ?? 0,
-      pricePerDay: (map['pricePerDay'] ?? 0).toDouble(),
-      totalRent: (map['totalRent'] ?? map['totalAmount'] ?? 0).toDouble(),
-      securityDeposit: (map['securityDeposit'] ?? 0).toDouble(),
-      cashPayments: Map<String, dynamic>.from(
-          map['cashPayments'] as Map? ?? defaultCashPayments),
-      renterName: map['renterName'] ?? '',
-      status: map['status'] ?? 'pending',
-      messageToHost: map['messageToHost'] ?? '',
-      cancellationPolicy: map['cancellationPolicy'] ?? 'flexible',
-      cancellationReason: map['cancellationReason'],
-      rejectionReason: map['rejectionReason'] ?? map['declineReason'],
-      reviewStatus: Map<String, dynamic>.from(
-          map['reviewStatus'] as Map? ?? defaultReviewStatus),
-      tripStartedAt: (map['tripStartedAt'] as Timestamp?)?.toDate(),
-      tripEndedAt: (map['tripEndedAt'] as Timestamp?)?.toDate(),
-      createdAt: createdAt,
-      updatedAt:
-          (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      expiresAt: (map['expiresAt'] as Timestamp?)?.toDate() ??
-          createdAt.add(const Duration(hours: 24)),
-    );
+    try {
+      return BookingModel(
+        id: id,
+        carId: map['carId'] ?? '',
+        hostId: map['hostId'] ?? '',
+        renterId: map['renterId'] ?? '',
+        carName: map['carName'] ?? '',
+        carPhoto: map['carPhoto'] ?? '',
+        carLocation: map['carLocation'] ?? '',
+        startDate: (map['startDate'] is Timestamp) ? (map['startDate'] as Timestamp).toDate() : DateTime.now(),
+        endDate: (map['endDate'] is Timestamp) ? (map['endDate'] as Timestamp).toDate() : DateTime.now(),
+        totalDays: map['totalDays'] ?? 0,
+        pricePerDay: (map['pricePerDay'] ?? 0).toDouble(),
+        totalRent: (map['totalRent'] ?? map['totalAmount'] ?? 0).toDouble(),
+        securityDeposit: (map['securityDeposit'] ?? 0).toDouble(),
+        cashPayments: Map<String, dynamic>.from(
+            map['cashPayments'] as Map? ?? defaultCashPayments),
+        renterName: map['renterName'] ?? '',
+        status: map['status'] ?? 'pending',
+        messageToHost: map['messageToHost'] ?? '',
+        cancellationPolicy: map['cancellationPolicy'] ?? 'flexible',
+        cancellationReason: map['cancellationReason'],
+        rejectionReason: map['rejectionReason'] ?? map['declineReason'],
+        reviewStatus: Map<String, dynamic>.from(
+            map['reviewStatus'] as Map? ?? defaultReviewStatus),
+        tripStartedAt: (map['tripStartedAt'] is Timestamp) ? (map['tripStartedAt'] as Timestamp).toDate() : null,
+        tripEndedAt: (map['tripEndedAt'] is Timestamp) ? (map['tripEndedAt'] as Timestamp).toDate() : null,
+        createdAt: createdAt,
+        updatedAt: (map['updatedAt'] is Timestamp)
+            ? (map['updatedAt'] as Timestamp).toDate()
+            : DateTime.now(),
+        expiresAt: (map['expiresAt'] is Timestamp)
+            ? (map['expiresAt'] as Timestamp).toDate()
+            : createdAt.add(const Duration(hours: 24)),
+      );
+    } catch (e) {
+      print('Error parsing BookingModel: $e');
+      // Return a fallback model so the stream doesn't crash completely,
+      // though usually we want to just throw. For debugging, let's print.
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toMap() {

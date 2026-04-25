@@ -1,12 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import '../models/listing_model.dart';
 import '../models/pricing_breakdown_model.dart';
+import '../models/review_model.dart';
 import '../providers/auth_provider.dart';
+import '../services/booking_service.dart';
 import '../widgets/availability_calendar.dart';
 import '../utils/pricing_calculator.dart';
 import 'booking/booking_summary_screen.dart';
+import 'reviews/all_reviews_screen.dart';
 
 class CarDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -22,6 +25,19 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   DateTime? _selectedStart;
   DateTime? _selectedEnd;
   CashPricingBreakdown? _pricingEstimate;
+  List<ReviewModel> _reviews = [];
+  bool _reviewsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews() async {
+    final reviews = await BookingService().fetchCarReviews(widget.listing.id, limit: 3);
+    if (mounted) setState(() { _reviews = reviews; _reviewsLoaded = true; });
+  }
 
   void _updatePricing() {
     if (_selectedStart != null && _selectedEnd != null) {
@@ -488,7 +504,18 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 100), // Space for bottom button
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 24),
+
+                      // ── Reviews Section ──────────────────────────────────
+                      _ReviewsSection(
+                        listing: widget.listing,
+                        reviews: _reviews,
+                        loaded: _reviewsLoaded,
+                      ),
+
+                      const SizedBox(height: 100), // bottom button space
                     ],
                   ),
                 ),
@@ -675,3 +702,191 @@ Widget _buildTimelineStep(String number, String title, String subtitle) {
     ),
   );
 }
+
+// ─── Reviews Section ─────────────────────────────────────────────────────────
+
+class _ReviewsSection extends StatelessWidget {
+  final ListingModel listing;
+  final List<ReviewModel> reviews;
+  final bool loaded;
+
+  const _ReviewsSection({
+    required this.listing,
+    required this.reviews,
+    required this.loaded,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Header with average
+      Row(children: [
+        Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Reviews',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          if (listing.totalReviews > 0) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.star_rounded,
+                  color: Color(0xFFFACC15), size: 18),
+              const SizedBox(width: 4),
+              Text(listing.averageRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(' (${listing.totalReviews} ${listing.totalReviews == 1 ? "review" : "reviews"})',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+            ])
+          ],
+        ])),
+        if (listing.totalReviews > 3)
+          TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => AllReviewsScreen(
+                        targetId: listing.id,
+                        targetName: listing.carName,
+                        type: 'car',
+                      )),
+            ),
+            child: Text('View all ${listing.totalReviews}',
+                style: const TextStyle(color: Color(0xFF7C3AED))),
+          ),
+      ]),
+
+      // Rating breakdown bars
+      if (listing.totalReviews > 0) ...[
+        const SizedBox(height: 16),
+        ...List.generate(5, (i) {
+          final star = (5 - i).toString();
+          final count = listing.ratingBreakdown[star] ?? 0;
+          final pct = listing.totalReviews > 0
+              ? count / listing.totalReviews
+              : 0.0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              Text('$star ★',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  backgroundColor: Colors.grey.shade200,
+                  color: const Color(0xFFFACC15),
+                  minHeight: 8,
+                ),
+              )),
+              const SizedBox(width: 8),
+              SizedBox(
+                  width: 24,
+                  child: Text('$count',
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 12))),
+            ]),
+          );
+        }),
+        const SizedBox(height: 16),
+      ],
+
+      // Review cards (max 3)
+      if (!loaded)
+        const Center(child: CircularProgressIndicator())
+      else if (reviews.isEmpty)
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          alignment: Alignment.center,
+          child: Text('No reviews yet. Be the first to review this car!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
+        )
+      else
+        ...reviews.map((r) => _SmallReviewCard(review: r)),
+
+      if (reviews.length >= 3 && listing.totalReviews > 3)
+        Center(
+          child: TextButton.icon(
+            icon: const Icon(Icons.arrow_forward,
+                size: 16, color: Color(0xFF7C3AED)),
+            label: const Text('View all reviews',
+                style: TextStyle(color: Color(0xFF7C3AED))),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => AllReviewsScreen(
+                        targetId: listing.id,
+                        targetName: listing.carName,
+                        type: 'car',
+                      )),
+            ),
+          ),
+        ),
+    ]);
+  }
+}
+
+class _SmallReviewCard extends StatelessWidget {
+  final ReviewModel review;
+  const _SmallReviewCard({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+            child: Text(
+              review.reviewerName.isNotEmpty
+                  ? review.reviewerName[0].toUpperCase()
+                  : '?',
+              style: const TextStyle(
+                  color: Color(0xFF7C3AED),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(review.reviewerName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 13))),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (i) {
+              return Icon(
+                (i + 1).toDouble() <= review.overallRating
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                color: (i + 1).toDouble() <= review.overallRating
+                    ? const Color(0xFFFACC15)
+                    : Colors.grey.shade300,
+                size: 14,
+              );
+            }),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Text(review.comment,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+                height: 1.4)),
+      ]),
+    );
+  }
+}
+

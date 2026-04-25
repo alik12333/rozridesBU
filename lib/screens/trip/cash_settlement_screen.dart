@@ -6,6 +6,7 @@ import '../../models/booking_model.dart';
 import '../../models/inspection_model.dart';
 import '../../models/post_inspection_model.dart';
 import '../../services/booking_service.dart';
+import '../booking/dispute_screen.dart';
 
 class CashSettlementScreen extends StatefulWidget {
   final BookingModel booking;
@@ -330,28 +331,15 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.flag_outlined),
                 label: const Text('RAISE A DISPUTE WITH ROZRIDES'),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
-                      title: const Text('Disputes — Coming Soon'),
-                      content: const Text(
-                          'The dispute resolution feature is a future update. '
-                          'Please contact RozRides support directly at +92-300-ROZRIDE.'),
-                      actions: [
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF7C3AED),
-                              foregroundColor: Colors.white),
-                          child: const Text('OK'),
-                        ),
-                      ],
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DisputeScreen(
+                      booking: widget.booking,
+                      hostClaimedDeduction: _deduction,
                     ),
-                  );
-                },
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red.shade600,
                   side: BorderSide(color: Colors.red.shade300),

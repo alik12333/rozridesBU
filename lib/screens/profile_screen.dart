@@ -311,7 +311,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Divider(),
                   const SizedBox(height: 24),
 
+                  // Ratings section
+                  if ((user.hostRating ?? 0) > 0 || (user.renterRating ?? 0) > 0) ...[
+                    Text('Reputation', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      if ((user.hostRating ?? 0) > 0)
+                        Expanded(child: _RatingBadge(
+                          label: 'As Host',
+                          rating: user.hostRating!,
+                          count: user.hostReviewCount ?? 0,
+                          color: const Color(0xFF7C3AED),
+                        )),
+                      if ((user.hostRating ?? 0) > 0 && (user.renterRating ?? 0) > 0)
+                        const SizedBox(width: 12),
+                      if ((user.renterRating ?? 0) > 0)
+                        Expanded(child: _RatingBadge(
+                          label: 'As Renter',
+                          rating: user.renterRating!,
+                          count: user.renterReviewCount ?? 0,
+                          color: const Color(0xFF0EA5E9),
+                        )),
+                    ]),
+                    const SizedBox(height: 32),
+                    const Divider(),
+                    const SizedBox(height: 24),
+                  ],
+
                   // Contact Information
+
                   Text(
                     'Contact Information',
                     style: Theme.of(context).textTheme.titleLarge,
@@ -673,6 +701,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Rating Badge Widget ──────────────────────────────────────────────────────
+
+class _RatingBadge extends StatelessWidget {
+  final String label;
+  final double rating;
+  final int count;
+  final Color color;
+
+  const _RatingBadge({
+    required this.label,
+    required this.rating,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 20),
+          const SizedBox(width: 4),
+          Text(rating.toStringAsFixed(1),
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+        ]),
+        const SizedBox(height: 4),
+        Text(label,
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+        Text('$count ${count == 1 ? "review" : "reviews"}',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+      ]),
     );
   }
 }

@@ -13,7 +13,12 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hostRating', 'hostReviewCount']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['renterRating', 'renterReviewCount']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hostRating', 'hostReviewCount', 'renterRating', 'renterReviewCount'])
+      );
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow delete: if isAdmin();
       
@@ -30,7 +35,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         resource.data.ownerId == request.auth.uid || 
         isAdmin() || 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedDateRanges'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedDateRanges']) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['averageRating', 'totalReviews', 'ratingBreakdown'])
       );
       allow delete: if isAuthenticated() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
@@ -89,6 +95,41 @@ service cloud.firestore {
     match /admin_alerts/{alertId} {
       allow read, update, delete: if isAdmin();
       allow create: if isAuthenticated();
+    }
+
+    match /damageClaims/{claimId} {
+      // Only the renter of the booking can create a claim
+      allow create: if isAuthenticated();
+      // Both parties and admins can read
+      allow read: if isAuthenticated() && (
+        resource.data.hostId == request.auth.uid ||
+        resource.data.renterId == request.auth.uid ||
+        isAdmin()
+      );
+      // Only admins can update (resolve)
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /reviews/{reviewId} {
+      // Only the reviewer can create (one per booking per user — enforced in app)
+      allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
+      // Public reviews are readable by all authenticated users
+      allow read: if isAuthenticated();
+      // Only admin can update (flag, force publish), or users can trigger auto-publish
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPublic']) &&
+        request.resource.data.isPublic == true
+      );
+      allow delete: if false;
+    }
+
+    match /scheduledNotifications/{notifId} {
+      allow create: if isAuthenticated();
+      // Only Cloud Functions (admin SDK) read and update these
+      allow read, update: if false;
+      allow delete: if false;
     }
   }
 }

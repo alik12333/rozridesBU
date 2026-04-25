@@ -8,6 +8,7 @@ import '../../providers/booking_provider.dart';
 import '../../utils/booking_status_utils.dart';
 import '../booking/booking_detail_screen.dart';
 import '../trip/pre_trip_inspection_screen.dart';
+import 'request_detail_screen.dart';
 
 class HostBookingsScreen extends StatefulWidget {
   const HostBookingsScreen({super.key});
@@ -144,8 +145,13 @@ class _HostBookingCard extends StatelessWidget {
     final color = getStatusColor(b.status);
 
     return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id))),
+      onTap: () {
+        if (b.status == 'pending') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => RequestDetailScreen(bookingId: b.id)));
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id)));
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
@@ -263,7 +269,7 @@ class _HostBookingCard extends StatelessWidget {
       label = 'View Request';
       color = const Color(0xFF7C3AED);
       onTap = () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id)));
+          MaterialPageRoute(builder: (_) => RequestDetailScreen(bookingId: b.id)));
     }
 
     if (label == null) return const SizedBox.shrink();

@@ -11,6 +11,7 @@ import '../../utils/booking_status_utils.dart';
 import '../trip/active_trip_screen.dart';
 import '../trip/post_trip_inspection_screen.dart';
 import '../trip/pre_trip_inspection_screen.dart';
+import '../reviews/submit_review_screen.dart';
 import 'cancellation_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
@@ -23,12 +24,14 @@ class BookingDetailScreen extends StatefulWidget {
 
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final BookingService _service = BookingService();
+  late final Stream<BookingModel?> _bookingStream;
   Map<String, dynamic>? _otherPartyData;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _bookingStream = _service.streamBooking(widget.bookingId);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -87,7 +90,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Widget build(BuildContext context) {
     final currentUser = context.read<AuthProvider>().currentUser;
     return StreamBuilder<BookingModel?>(
-      stream: _service.streamBooking(widget.bookingId),
+      stream: _bookingStream,
       builder: (context, snap) {
         if (!snap.hasData) {
           return Scaffold(
@@ -368,6 +371,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost) {
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
     final List<Widget> buttons = [];
 
     if (isHost) {
@@ -438,12 +442,40 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'renter'))),
         ));
       }
-      if (booking.status == 'completed' && booking.reviewStatus['renterSubmitted'] != true) {
+      // Leave a Review — Renter
+      if (booking.status == 'completed' &&
+          booking.reviewStatus['renterSubmitted'] != true &&
+          currentUserId == booking.renterId) {
         buttons.add(_actionBtn(
-          label: 'Leave a Review',
+          label: 'Leave a Review ⭐',
           color: const Color(0xFF7C3AED),
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Reviews coming in Phase 9'))),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SubmitReviewScreen(
+                booking: booking,
+                reviewType: 'renter_to_host',
+              ),
+            ),
+          ),
+        ));
+      }
+      // Leave a Review — Host
+      if (booking.status == 'completed' &&
+          booking.reviewStatus['hostSubmitted'] != true &&
+          currentUserId == booking.hostId) {
+        buttons.add(_actionBtn(
+          label: 'Review Renter ⭐',
+          color: const Color(0xFF7C3AED),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SubmitReviewScreen(
+                booking: booking,
+                reviewType: 'host_to_renter',
+              ),
+            ),
+          ),
         ));
       }
     }

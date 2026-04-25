@@ -3,9 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/booking_model.dart';
+import '../models/damage_claim_model.dart';
 import '../models/inspection_model.dart';
 import '../models/post_inspection_model.dart';
 import '../models/pricing_breakdown_model.dart';
+import '../models/review_model.dart';
 
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -925,6 +927,302 @@ class BookingService {
       return PreTripInspection.fromMap(doc.data()!);
     } catch (_) {
       return null;
+    }
+  }
+
+  // ──────────────────────────── RAISE DISPUTE ────────────────────────────
+
+  Future<void> raiseDispute({
+    required BookingModel booking,
+    required String description,
+    required double renterBelievesAmount,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+
+    final bookingId = booking.id;
+    final preRef  = 'bookings/$bookingId/inspections/pre_trip';
+    final postRef = 'bookings/$bookingId/inspections/post_trip';
+
+    final claimRef = _firestore.collection('damageClaims').doc();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+    final now = FieldValue.serverTimestamp();
+
+    final claim = DamageClaim(
+      claimId: claimRef.id,
+      bookingId: bookingId,
+      carId: booking.carId,
+      hostId: booking.hostId,
+      renterId: booking.renterId,
+      raisedBy: currentUser.uid,
+      description: description,
+      hostClaimedDeduction: booking.cashPayments['damageDeduction']?.toDouble() ?? 0,
+      renterAgreedDeduction: renterBelievesAmount,
+      preInspectionRef: preRef,
+      postInspectionRef: postRef,
+      createdAt: DateTime.now(),
+    );
+
+    final batch = _firestore.batch();
+
+    // 1. Write damage claim
+    batch.set(claimRef, claim.toMap());
+
+    // 2. Update booking status
+    batch.update(bookingRef, {
+      'status': 'disputed',
+      'updatedAt': now,
+    });
+
+    // 3. Timeline event
+    _addTimelineEvent(
+      batch, bookingId, 'disputed',
+      'Dispute raised by renter. Host claimed PKR ${claim.hostClaimedDeduction.toStringAsFixed(0)}. Renter believes correct amount is PKR ${renterBelievesAmount.toStringAsFixed(0)}.',
+      currentUser.uid,
+    );
+
+    // 4. Admin alert
+    final adminAlertRef = _firestore.collection('adminAlerts').doc();
+    batch.set(adminAlertRef, {
+      'type': 'damage_dispute',
+      'bookingId': bookingId,
+      'claimId': claimRef.id,
+      'renterName': booking.renterName,
+      'hostId': booking.hostId,
+      'message': 'New dispute raised for booking $bookingId. Review required.',
+      'createdAt': now,
+      'resolved': false,
+    });
+
+    // 5. Notify host
+    final hostNotifRef = _firestore
+        .collection('users')
+        .doc(booking.hostId)
+        .collection('notifications')
+        .doc();
+    batch.set(hostNotifRef, {
+      'type': 'dispute_raised',
+      'title': 'Renter raised a dispute',
+      'body':
+          'The renter has raised a dispute regarding the damage claim. RozRides admin will review and contact both parties.',
+      'bookingId': bookingId,
+      'isRead': false,
+      'isUnread': true,
+      'createdAt': now,
+    });
+
+    await batch.commit();
+  }
+
+  // ──────────────────────────── SUBMIT REVIEW ────────────────────────────
+
+  Future<void> submitReview({
+    required String bookingId,
+    required String revieweeId,
+    required String? carId,
+    required String type, // renter_to_host | host_to_renter
+    required double rating,
+    required String comment,
+    required String reviewerName,
+    String? reviewerPhoto,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final reviewerId = currentUser.uid;
+
+    // Check for duplicate
+    final existing = await _firestore
+        .collection('reviews')
+        .where('bookingId', isEqualTo: bookingId)
+        .where('reviewerId', isEqualTo: reviewerId)
+        .limit(1)
+        .get();
+    if (existing.docs.isNotEmpty) throw Exception('ALREADY_REVIEWED');
+
+    final reviewRef = _firestore.collection('reviews').doc();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+    final now = FieldValue.serverTimestamp();
+
+    final review = ReviewModel(
+      reviewId: reviewRef.id,
+      bookingId: bookingId,
+      reviewerId: reviewerId,
+      revieweeId: revieweeId,
+      carId: carId,
+      type: type,
+      overallRating: rating,
+      comment: comment,
+      reviewerName: reviewerName,
+      reviewerPhoto: reviewerPhoto,
+      isPublic: false,
+      createdAt: DateTime.now(),
+    );
+
+    final batch = _firestore.batch();
+    batch.set(reviewRef, review.toMap());
+
+    // Update booking reviewStatus
+    final statusField = type == 'renter_to_host' ? 'renterSubmitted' : 'hostSubmitted';
+    batch.update(bookingRef, {
+      'reviewStatus.$statusField': true,
+      'updatedAt': now,
+    });
+
+    await batch.commit();
+
+    // Check if both submitted → make both public + update aggregates
+    final bookingSnap = await bookingRef.get();
+    final reviewStatus =
+        bookingSnap.data()?['reviewStatus'] as Map<String, dynamic>? ?? {};
+    final bothSubmitted =
+        reviewStatus['renterSubmitted'] == true &&
+        reviewStatus['hostSubmitted'] == true;
+
+    if (bothSubmitted) {
+      await _publishReviewsAndUpdateAggregates(bookingId, carId, revieweeId, type);
+    } else {
+      // Schedule 7-day window to auto-publish
+      final sendAt = Timestamp.fromDate(
+          DateTime.now().add(const Duration(days: 7)));
+      await _firestore.collection('scheduledNotifications').add({
+        'type': 'auto_publish_reviews',
+        'bookingId': bookingId,
+        'sendAt': sendAt,
+        'sent': false,
+        'createdAt': now,
+      });
+    }
+  }
+
+  Future<void> _publishReviewsAndUpdateAggregates(
+    String bookingId,
+    String? carId,
+    String revieweeId,
+    String type,
+  ) async {
+    // Publish all reviews for this booking
+    final reviewsSnap = await _firestore
+        .collection('reviews')
+        .where('bookingId', isEqualTo: bookingId)
+        .get();
+    final publishBatch = _firestore.batch();
+    for (final doc in reviewsSnap.docs) {
+      publishBatch.update(doc.reference, {'isPublic': true});
+    }
+    await publishBatch.commit();
+
+    // Update car aggregate (renter_to_host reviews have a carId)
+    if (carId != null && type == 'renter_to_host') {
+      await _updateCarRatingAggregate(carId);
+    }
+    // Update user aggregate
+    await _updateUserRatingAggregate(revieweeId, type);
+  }
+
+  Future<void> _updateCarRatingAggregate(String carId) async {
+    final snap = await _firestore
+        .collection('reviews')
+        .where('carId', isEqualTo: carId)
+        .where('isPublic', isEqualTo: true)
+        .get();
+
+    if (snap.docs.isEmpty) return;
+    final ratings = snap.docs
+        .map((d) => (d.data()['overallRating'] as num).toDouble())
+        .toList();
+    final avg = ratings.reduce((a, b) => a + b) / ratings.length;
+    final breakdown = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0};
+    for (final r in ratings) {
+      final key = r.round().clamp(1, 5).toString();
+      breakdown[key] = (breakdown[key] ?? 0) + 1;
+    }
+    await _firestore.collection('listings').doc(carId).update({
+      'averageRating': double.parse(avg.toStringAsFixed(1)),
+      'totalReviews': ratings.length,
+      'ratingBreakdown': breakdown,
+    });
+  }
+
+  Future<void> _updateUserRatingAggregate(String userId, String type) async {
+    final snap = await _firestore
+        .collection('reviews')
+        .where('revieweeId', isEqualTo: userId)
+        .where('type', isEqualTo: type)
+        .where('isPublic', isEqualTo: true)
+        .get();
+
+    if (snap.docs.isEmpty) return;
+    final ratings = snap.docs
+        .map((d) => (d.data()['overallRating'] as num).toDouble())
+        .toList();
+    final avg = ratings.reduce((a, b) => a + b) / ratings.length;
+
+    if (type == 'renter_to_host') {
+      await _firestore.collection('users').doc(userId).update({
+        'hostRating': double.parse(avg.toStringAsFixed(1)),
+        'hostReviewCount': ratings.length,
+      });
+    } else {
+      await _firestore.collection('users').doc(userId).update({
+        'renterRating': double.parse(avg.toStringAsFixed(1)),
+        'renterReviewCount': ratings.length,
+      });
+    }
+  }
+
+  // Fetch public reviews for a car
+  Future<List<ReviewModel>> fetchCarReviews(String carId,
+      {int limit = 50}) async {
+    try {
+      final snap = await _firestore
+          .collection('reviews')
+          .where('carId', isEqualTo: carId)
+          .where('isPublic', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      return snap.docs
+          .map((d) => ReviewModel.fromMap(d.data(), d.id))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Fetch public reviews written about a user
+  Future<List<ReviewModel>> fetchUserReviews(String userId,
+      String type, {int limit = 50}) async {
+    try {
+      final snap = await _firestore
+          .collection('reviews')
+          .where('revieweeId', isEqualTo: userId)
+          .where('type', isEqualTo: type)
+          .where('isPublic', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+      return snap.docs
+          .map((d) => ReviewModel.fromMap(d.data(), d.id))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Check if current user already reviewed this booking
+  Future<bool> hasReviewed(String bookingId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    try {
+      final snap = await _firestore
+          .collection('reviews')
+          .where('bookingId', isEqualTo: bookingId)
+          .where('reviewerId', isEqualTo: uid)
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty;
+    } catch (_) {
+      return false;
     }
   }
 

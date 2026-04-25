@@ -96,6 +96,8 @@ class BookingProvider extends ChangeNotifier {
     _hostAllSub = _service.getBookingsForHost(hostId).listen((bookings) {
       _hostAllBookings = bookings;
       notifyListeners();
+    }, onError: (e) {
+      print('ERROR IN hostAllSub: $e');
     });
   }
 
@@ -112,6 +114,8 @@ class BookingProvider extends ChangeNotifier {
       }
       _renterBookings = bookings;
       notifyListeners();
+    }, onError: (e) {
+      print('ERROR IN renterSub: $e');
     });
   }
 

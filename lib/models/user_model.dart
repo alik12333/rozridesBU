@@ -7,7 +7,11 @@ class UserModel {
   final String? profilePhoto;
   final CNIC? cnic;
   final Location? location;
-  final Roles? roles; // NEW FIELD
+  final Roles? roles;
+  final double? renterRating;
+  final int? renterReviewCount;
+  final double? hostRating;
+  final int? hostReviewCount;
 
   UserModel({
     required this.id,
@@ -17,7 +21,11 @@ class UserModel {
     this.profilePhoto,
     this.cnic,
     this.location,
-    this.roles, // NEW FIELD
+    this.roles,
+    this.renterRating,
+    this.renterReviewCount,
+    this.hostRating,
+    this.hostReviewCount,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -28,9 +36,12 @@ class UserModel {
       phoneNumber: map['phoneNumber'] ?? '',
       profilePhoto: map['profilePhoto'],
       cnic: map['cnic'] != null ? CNIC.fromMap(map['cnic']) : null,
-      location:
-      map['location'] != null ? Location.fromMap(map['location']) : null,
-      roles: map['roles'] != null ? Roles.fromMap(map['roles']) : Roles(isOwner: false), // NEW
+      location: map['location'] != null ? Location.fromMap(map['location']) : null,
+      roles: map['roles'] != null ? Roles.fromMap(map['roles']) : Roles(isOwner: false),
+      renterRating: map['renterRating'] != null ? (map['renterRating']).toDouble() : null,
+      renterReviewCount: map['renterReviewCount'] as int?,
+      hostRating: map['hostRating'] != null ? (map['hostRating']).toDouble() : null,
+      hostReviewCount: map['hostReviewCount'] as int?,
     );
   }
 
@@ -42,7 +53,11 @@ class UserModel {
       'profilePhoto': profilePhoto,
       'cnic': cnic?.toMap(),
       'location': location?.toMap(),
-      'roles': roles?.toMap(), // NEW FIELD
+      'roles': roles?.toMap(),
+      'renterRating': renterRating,
+      'renterReviewCount': renterReviewCount,
+      'hostRating': hostRating,
+      'hostReviewCount': hostReviewCount,
     };
   }
 }

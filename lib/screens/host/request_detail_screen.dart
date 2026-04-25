@@ -18,6 +18,7 @@ class RequestDetailScreen extends StatefulWidget {
 
 class _RequestDetailScreenState extends State<RequestDetailScreen> {
   final BookingService _service = BookingService();
+  late final Stream<BookingModel?> _bookingStream;
   Map<String, dynamic>? _renterData;
   int _renterCompletedTrips = 0;
   bool _renterDataLoading = true;
@@ -26,6 +27,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _bookingStream = _service.streamBooking(widget.bookingId);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -349,7 +351,7 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<BookingModel?>(
-      stream: _service.streamBooking(widget.bookingId),
+      stream: _bookingStream,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(

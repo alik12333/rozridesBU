@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase-client';
-import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus, ClipboardList, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -51,6 +51,7 @@ export default function DashboardLayout({
         { href: '/dashboard/cnic', label: 'CNIC Verification', icon: BadgeCheck },
         { href: '/dashboard/listings', label: 'Car Listings', icon: Car },
         { href: '/dashboard/bookings', label: 'Bookings', icon: ClipboardList },
+        { href: '/dashboard/claims', label: 'Damage Claims', icon: AlertTriangle },
         { href: '/dashboard/add-admin', label: 'Add Admin', icon: ShieldPlus },
     ];
 

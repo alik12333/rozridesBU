@@ -41,6 +41,11 @@ class ListingModel {
   // Bookings
   final List<Map<String, dynamic>> bookedDateRanges;
 
+  // Ratings
+  final double averageRating;
+  final int totalReviews;
+  final Map<String, int> ratingBreakdown; // {'1': N, '2': N, ...}
+
   ListingModel({
     required this.id,
     required this.ownerId,
@@ -69,6 +74,9 @@ class ListingModel {
     this.locationLabel,
     this.isPickupFlexible = false,
     this.bookedDateRanges = const [],
+    this.averageRating = 0.0,
+    this.totalReviews = 0,
+    this.ratingBreakdown = const {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0},
   });
 
   factory ListingModel.fromMap(Map<String, dynamic> map, String id) {
@@ -102,6 +110,13 @@ class ListingModel {
       bookedDateRanges: map['bookedDateRanges'] != null
           ? List<Map<String, dynamic>>.from(map['bookedDateRanges'])
           : [],
+      averageRating: (map['averageRating'] ?? 0).toDouble(),
+      totalReviews: (map['totalReviews'] ?? 0) as int,
+      ratingBreakdown: map['ratingBreakdown'] != null
+          ? Map<String, int>.from(
+              (map['ratingBreakdown'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), (v as num).toInt())))
+          : {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0},
     );
   }
 
@@ -133,6 +148,9 @@ class ListingModel {
       'locationLabel': locationLabel,
       'isPickupFlexible': isPickupFlexible,
       'bookedDateRanges': bookedDateRanges,
+      'averageRating': averageRating,
+      'totalReviews': totalReviews,
+      'ratingBreakdown': ratingBreakdown,
     };
   }
 }
