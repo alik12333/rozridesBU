@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
+import '../providers/chat_provider.dart';
 import '../models/user_model.dart';
 import 'home_screen.dart';
 import 'host/host_bookings_screen.dart';
@@ -32,6 +33,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final provider = context.read<BookingProvider>();
     provider.listenToHostBookings(user.id);
     provider.listenToRenterBookings(user.id);
+    context.read<ChatProvider>().listenToConversations(user.id);
   }
 
   @override

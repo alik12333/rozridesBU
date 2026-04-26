@@ -22,7 +22,12 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            // Map exactly 'admin' to 'admin@rozrides.com'
+            const loginEmail = email.trim().toLowerCase() === 'admin' 
+                ? 'admin@rozrides.com' 
+                : email.trim();
+
+            const userCredential = await signInWithEmailAndPassword(auth, loginEmail, password);
 
             // Allow initial admin setup or check claims
             // For now, we fetch the user profile to check the role
@@ -47,7 +52,10 @@ export default function LoginPage() {
 
             if (userDoc.exists()) {
                 const userData = userDoc.data();
-                if (!userData?.roles?.isAdmin) {
+                const userRole = userData.role;
+                const isLegacyAdmin = userData.roles?.isAdmin;
+
+                if (userRole !== 'super_admin' && userRole !== 'admin' && !isLegacyAdmin) {
                     await auth.signOut();
                     throw new Error('Access Denied: You do not have administrator privileges.');
                 }
@@ -81,11 +89,11 @@ export default function LoginPage() {
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">Email or Username</Label>
                             <Input
                                 id="email"
-                                type="email"
-                                placeholder="admin@rozrides.com"
+                                type="text"
+                                placeholder="admin or admin@rozrides.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required

@@ -23,6 +23,16 @@ export interface User {
         isAdmin?: boolean;
     };
     fcmToken?: string;
+    // Reputation & Strikes
+    renterRating?: number;
+    renterTrips?: number;
+    hostRating?: number;
+    hostTrips?: number;
+    strikes?: {
+        lateCancellations?: number;
+        damage_incidents?: number;
+        disputed_deposits?: number;
+    };
 }
 
 export interface Listing {
@@ -63,6 +73,85 @@ export async function getAllUsers(): Promise<User[]> {
     } catch (error) {
         console.error('Error fetching users:', error);
         return [];
+    }
+}
+
+// Fetch a single user
+export async function getUser(userId: string): Promise<User | null> {
+    try {
+        const doc = await adminDb.collection('users').doc(userId).get();
+        if (!doc.exists) return null;
+        
+        return {
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data()?.createdAt?.toDate() || new Date(),
+            updatedAt: doc.data()?.updatedAt?.toDate() || new Date(),
+        } as User;
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        return null;
+    }
+}
+
+// Ban User
+export async function banUser(userId: string): Promise<void> {
+    try {
+        await adminDb.collection('users').doc(userId).update({
+            status: 'banned',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        await addNotification(userId, {
+            title: 'Account Banned',
+            message: 'Your account has been banned due to multiple policy violations.',
+            type: 'error'
+        });
+    } catch (error) {
+        console.error('Error banning user:', error);
+        throw error;
+    }
+}
+
+// Fetch all admins
+export async function getAdmins(): Promise<User[]> {
+    try {
+        const snapshot = await adminDb.collection('users')
+            .where('role', 'in', ['admin', 'super_admin'])
+            .get();
+            
+        // Legacy support
+        const legacySnapshot = await adminDb.collection('users')
+            .where('roles.isAdmin', '==', true)
+            .get();
+
+        const allDocs = new Map();
+        [...snapshot.docs, ...legacySnapshot.docs].forEach(doc => {
+            allDocs.set(doc.id, doc);
+        });
+
+        return Array.from(allDocs.values()).map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as User[];
+    } catch (error) {
+        console.error('Error fetching admins:', error);
+        return [];
+    }
+}
+
+// Revoke admin access
+export async function revokeAdmin(userId: string): Promise<void> {
+    try {
+        await adminDb.collection('users').doc(userId).update({
+            role: 'user',
+            'roles.isAdmin': false
+        });
+    } catch (error) {
+        console.error('Error revoking admin access:', error);
+        throw error;
     }
 }
 
@@ -155,13 +244,17 @@ export async function updateListingStatus(
 // Get dashboard stats
 export async function getDashboardStats() {
     try {
-        const [usersSnapshot, listingsSnapshot] = await Promise.all([
+        const [usersSnapshot, listingsSnapshot, bookingsSnapshot, claimsSnapshot] = await Promise.all([
             adminDb.collection('users').get(),
             adminDb.collection('listings').get(),
+            adminDb.collection('bookings').get(),
+            adminDb.collection('damageClaims').get(),
         ]);
 
         const users = usersSnapshot.docs.map(doc => doc.data());
         const listings = listingsSnapshot.docs.map(doc => doc.data());
+        const bookings = bookingsSnapshot.docs.map(doc => doc.data());
+        const claims = claimsSnapshot.docs.map(doc => doc.data());
 
         return {
             totalUsers: users.length,
@@ -172,6 +265,8 @@ export async function getDashboardStats() {
             verifiedUsers: users.filter(u => u.cnic?.verificationStatus === 'approved').length,
             pendingCNIC: users.filter(u => u.cnic?.verificationStatus === 'pending').length,
             rejectedCNIC: users.filter(u => u.cnic?.verificationStatus === 'rejected').length,
+            activeTrips: bookings.filter(b => b.status === 'active').length,
+            openDisputes: claims.filter(c => c.status === 'open').length,
         };
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
@@ -184,6 +279,8 @@ export async function getDashboardStats() {
             verifiedUsers: 0,
             pendingCNIC: 0,
             rejectedCNIC: 0,
+            activeTrips: 0,
+            openDisputes: 0,
         };
     }
 }
@@ -333,3 +430,56 @@ export async function markBookingDisputed(bookingId: string): Promise<void> {
     await batch.commit();
 }
 
+// ──────────────────────── REVIEWS MODERATION ─────────────────────────────
+
+export interface Review {
+    id: string;
+    bookingId: string;
+    carId?: string;
+    reviewerId: string;
+    reviewerName: string;
+    revieweeId: string;
+    type: string;
+    overallRating: number;
+    comment: string;
+    isPublic: boolean;
+    flagged?: boolean;
+    createdAt: Date;
+}
+
+export async function getFlaggedReviews(): Promise<Review[]> {
+    try {
+        const snapshot = await adminDb.collection('reviews')
+            .where('flagged', '==', true)
+            .orderBy('createdAt', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+        })) as Review[];
+    } catch (error) {
+        console.error('Error fetching flagged reviews:', error);
+        return [];
+    }
+}
+
+export async function dismissReviewFlag(reviewId: string): Promise<void> {
+    await adminDb.collection('reviews').doc(reviewId).update({
+        flagged: false,
+    });
+}
+
+export async function deleteReview(reviewId: string): Promise<void> {
+    const batch = adminDb.batch();
+    
+    // 1. Delete the review
+    const reviewRef = adminDb.collection('reviews').doc(reviewId);
+    batch.delete(reviewRef);
+
+    // Note: The recalculation of aggregate scores for users/cars should ideally
+    // be handled via a Firebase Cloud Function (e.g. onReviewDeleted trigger).
+    // For now, we are just deleting the document.
+
+    await batch.commit();
+}

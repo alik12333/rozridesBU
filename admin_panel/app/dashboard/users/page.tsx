@@ -56,6 +56,7 @@ export default async function UsersPage() {
                                     <TableHead>CNIC Status</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Joined</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -79,6 +80,11 @@ export default async function UsersPage() {
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {new Date(user.createdAt).toLocaleDateString()}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <a href={`/dashboard/users/${user.id}`} className="text-primary hover:underline font-medium text-sm">
+                                                    View Details
+                                                </a>
                                             </TableCell>
                                         </TableRow>
                                     ))

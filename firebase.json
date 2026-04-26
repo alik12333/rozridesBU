@@ -1,4 +1,7 @@
 {
+  "firestore": {
+    "rules": "admin_panel/firestore.rules"
+  },
   "functions": [
     {
       "source": "functions",

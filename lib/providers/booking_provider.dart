@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/booking_model.dart';
 import '../services/booking_service.dart';
@@ -97,7 +98,7 @@ class BookingProvider extends ChangeNotifier {
       _hostAllBookings = bookings;
       notifyListeners();
     }, onError: (e) {
-      print('ERROR IN hostAllSub: $e');
+      debugPrint('ERROR IN hostAllSub: $e');
     });
   }
 
@@ -115,7 +116,7 @@ class BookingProvider extends ChangeNotifier {
       _renterBookings = bookings;
       notifyListeners();
     }, onError: (e) {
-      print('ERROR IN renterSub: $e');
+      debugPrint('ERROR IN renterSub: $e');
     });
   }
 

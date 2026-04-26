@@ -371,7 +371,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost) {
-    final currentUserId = context.read<AuthProvider>().currentUser?.id;
     final List<Widget> buttons = [];
 
     if (isHost) {
@@ -411,6 +410,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           onPressed: () => _navigateToReturn(context, booking),
         ));
       }
+      // ── Host review button (completed trip) ─────────────────────────────
+      if (booking.status == 'completed' &&
+          booking.reviewStatus['hostSubmitted'] != true) {
+        buttons.add(_actionBtn(
+          label: 'Review Renter ⭐',
+          color: const Color(0xFF7C3AED),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SubmitReviewScreen(
+                booking: booking,
+                reviewType: 'host_to_renter',
+              ),
+            ),
+          ),
+        ));
+      }
     } else {
       if (booking.status == 'active') {
         buttons.add(_actionBtn(
@@ -442,10 +458,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'renter'))),
         ));
       }
-      // Leave a Review — Renter
+      // ── Renter review button (completed trip) ──────────────────────────
       if (booking.status == 'completed' &&
-          booking.reviewStatus['renterSubmitted'] != true &&
-          currentUserId == booking.renterId) {
+          booking.reviewStatus['renterSubmitted'] != true) {
         buttons.add(_actionBtn(
           label: 'Leave a Review ⭐',
           color: const Color(0xFF7C3AED),
@@ -455,24 +470,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               builder: (_) => SubmitReviewScreen(
                 booking: booking,
                 reviewType: 'renter_to_host',
-              ),
-            ),
-          ),
-        ));
-      }
-      // Leave a Review — Host
-      if (booking.status == 'completed' &&
-          booking.reviewStatus['hostSubmitted'] != true &&
-          currentUserId == booking.hostId) {
-        buttons.add(_actionBtn(
-          label: 'Review Renter ⭐',
-          color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SubmitReviewScreen(
-                booking: booking,
-                reviewType: 'host_to_renter',
               ),
             ),
           ),

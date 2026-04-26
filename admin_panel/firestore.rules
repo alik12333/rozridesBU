@@ -42,16 +42,34 @@ service cloud.firestore {
     }
     
     match /bookings/{bookingId} {
-      // Relaxed read for debugging but still requires auth
-      // In production, we should ensure queries filter by hostId or renterId
       allow read: if isAuthenticated();
       
+      // Only renters can create a booking (and it must have their uid as renterId)
       allow create: if isAuthenticated() && request.resource.data.renterId == request.auth.uid;
-                      
+      
+      // Field-level update rules — each role can only touch the fields it owns
       allow update: if isAuthenticated() && (
-        resource.data.renterId == request.auth.uid || 
-        resource.data.hostId == request.auth.uid || 
-        isAdmin()
+        isAdmin() ||
+        // Renter can cancel (status → cancelled) or update cancellationReason
+        (
+          resource.data.renterId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'cancellationReason', 'updatedAt'])
+        ) ||
+        // Host can accept, decline, start trip (status → active), close trip (status → completed)
+        (
+          resource.data.hostId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'rejectionReason', 'updatedAt',
+                      'bookedDateRanges', 'warningNotificationSent',
+                      'tripStartedAt', 'tripEndedAt', 'cashPayments'])
+        ) ||
+        // Review status updates (either party submitting review)
+        (
+          (resource.data.renterId == request.auth.uid || resource.data.hostId == request.auth.uid) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['reviewStatus', 'updatedAt'])
+        )
       );
       
       allow delete: if isAdmin();
@@ -64,7 +82,6 @@ service cloud.firestore {
 
       match /inspections/{inspectionId} {
         allow read: if isAuthenticated() && (
-          resource.data.bookingId == bookingId ||
           get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid ||
           get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid
         );
@@ -92,31 +109,26 @@ service cloud.firestore {
       }
     }
     
-    match /admin_alerts/{alertId} {
+    // ── adminAlerts (camelCase — matches Cloud Function writes) ──────────────
+    match /adminAlerts/{alertId} {
       allow read, update, delete: if isAdmin();
       allow create: if isAuthenticated();
     }
 
     match /damageClaims/{claimId} {
-      // Only the renter of the booking can create a claim
       allow create: if isAuthenticated();
-      // Both parties and admins can read
       allow read: if isAuthenticated() && (
         resource.data.hostId == request.auth.uid ||
         resource.data.renterId == request.auth.uid ||
         isAdmin()
       );
-      // Only admins can update (resolve)
       allow update: if isAdmin();
       allow delete: if false;
     }
 
     match /reviews/{reviewId} {
-      // Only the reviewer can create (one per booking per user — enforced in app)
       allow create: if isAuthenticated() && request.resource.data.reviewerId == request.auth.uid;
-      // Public reviews are readable by all authenticated users
       allow read: if isAuthenticated();
-      // Only admin can update (flag, force publish), or users can trigger auto-publish
       allow update: if isAdmin() || (
         isAuthenticated() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPublic']) &&

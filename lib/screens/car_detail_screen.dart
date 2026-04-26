@@ -10,6 +10,8 @@ import '../widgets/availability_calendar.dart';
 import '../utils/pricing_calculator.dart';
 import 'booking/booking_summary_screen.dart';
 import 'reviews/all_reviews_screen.dart';
+import '../services/chat_service.dart';
+import 'chat/chat_screen.dart';
 
 class CarDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -73,6 +75,49 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
             content: Text('Could not launch phone dialer'),
             backgroundColor: Colors.red,
           ),
+        );
+      }
+    }
+  }
+
+  Future<void> _startChat() async {
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login to message the host.')),
+      );
+      return;
+    }
+    if (user.id == widget.listing.ownerId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You cannot message yourself.')),
+      );
+      return;
+    }
+
+    try {
+      final conv = await ChatService().getOrCreateConversation(
+        carId: widget.listing.id,
+        carName: widget.listing.carName,
+        hostId: widget.listing.ownerId,
+        hostName: widget.listing.ownerName,
+      );
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: conv.conversationId,
+              currentUserId: user.id,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e')),
         );
       }
     }
@@ -498,6 +543,18 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                                     ],
                                   )
                                 ],
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                                color: const Color(0xFF7C3AED),
+                                onPressed: _startChat,
+                                tooltip: 'Message Host',
                               ),
                             ),
                           ],

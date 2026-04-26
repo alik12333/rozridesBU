@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -8,6 +9,7 @@ import '../models/inspection_model.dart';
 import '../models/post_inspection_model.dart';
 import '../models/pricing_breakdown_model.dart';
 import '../models/review_model.dart';
+import 'chat_service.dart';
 
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -321,20 +323,33 @@ class BookingService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Create conversation document for future chat (Phase 10)
-      final conversationRef = _firestore.collection('conversations').doc(bookingId);
-      tx.set(conversationRef, {
-        'bookingId': bookingId,
-        'hostId': hostId,
-        'renterId': renterId,
-        'carName': carName,
-        'lastMessage': null,
-        'lastMessageAt': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Remove the hardcoded conversation creation since we will handle it after tx
     });
 
-    // ── Post-transaction: auto-decline overlapping bookings ─────────────
+    // ── Post-transaction: Chat & Auto-decline ────────────────────────────
+    try {
+      final chatSvc = ChatService();
+      final conv = await chatSvc.getOrCreateConversation(
+        carId: carId,
+        carName: carName,
+        hostId: hostId,
+        hostName: hostName,
+      );
+      await chatSvc.linkBookingToConversation(
+        carId: carId,
+        renterId: renterId,
+        bookingId: bookingId,
+        bookingStatus: 'confirmed',
+      );
+      final dateStr = '${_fmt(startDate)} to ${_fmt(endDate)}';
+      await chatSvc.postSystemMessage(
+        conversationId: conv.conversationId,
+        text: 'Booking confirmed for $carName — $dateStr. You can now coordinate pickup details here.',
+      );
+    } catch (e) {
+      debugPrint('Error creating chat: $e');
+    }
+
     await _autoDeclineOverlapping(bookingId, carId, startDate, endDate, hostId);
   }
 
@@ -552,6 +567,18 @@ class BookingService {
         }
       } catch (_) {}
     }
+
+    try {
+      final convId = '${carId}_$renterId';
+      await ChatService().updateConversationBookingStatus(
+        conversationId: convId,
+        bookingStatus: 'cancelled',
+      );
+      await ChatService().postSystemMessage(
+        conversationId: convId,
+        text: '❌ This booking was cancelled. This conversation is now closed.',
+      );
+    } catch (_) {}
   }
 
   // ──────────────────────── EXPIRE BOOKING ────────────────────────────────
@@ -593,22 +620,30 @@ class BookingService {
     return _firestore
         .collection('bookings')
         .where('renterId', isEqualTo: renterId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => BookingModel.fromMap(d.data(), d.id))
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => BookingModel.fromMap(d.data(), d.id))
+              .toList();
+          // Sort in-memory — avoids composite index requirement
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   Stream<List<BookingModel>> getBookingsForHost(String hostId) {
     return _firestore
         .collection('bookings')
         .where('hostId', isEqualTo: hostId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => BookingModel.fromMap(d.data(), d.id))
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => BookingModel.fromMap(d.data(), d.id))
+              .toList();
+          // Sort in-memory — avoids composite index requirement
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   Stream<List<BookingModel>> getPendingRequestsForHost(String hostId) {
@@ -616,11 +651,15 @@ class BookingService {
         .collection('bookings')
         .where('hostId', isEqualTo: hostId)
         .where('status', isEqualTo: 'pending')
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => BookingModel.fromMap(d.data(), d.id))
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => BookingModel.fromMap(d.data(), d.id))
+              .toList();
+          // Sort in-memory — avoids composite index requirement
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        });
   }
 
   /// Stream a single booking document in real-time.
@@ -696,6 +735,7 @@ class BookingService {
     final bookingSnap = await _firestore.collection('bookings').doc(bookingId).get();
     if (!bookingSnap.exists) throw Exception('Booking not found');
     final data = bookingSnap.data()!;
+    final carId     = data['carId'] as String? ?? '';
     final renterId  = data['renterId'] as String? ?? '';
     final carName   = data['carName']  as String? ?? '';
     final endDate   = (data['endDate'] as Timestamp).toDate();
@@ -749,17 +789,18 @@ class BookingService {
     // 7. Write conversation system message (outside batch — best-effort)
     try {
       final now = DateTime.now();
-      await _firestore
-          .collection('conversations')
-          .doc(bookingId)
-          .collection('messages')
-          .add({
-        'type': 'system',
-        'text': '🚗 Trip started on ${_fmt(now)}. '
+      final convId = '${carId}_$renterId';
+      
+      await ChatService().updateConversationBookingStatus(
+        conversationId: convId,
+        bookingStatus: 'active',
+      );
+      await ChatService().postSystemMessage(
+        conversationId: convId,
+        text: '🚗 Trip started on ${_fmt(now)}. '
             'Security deposit of PKR ${deposit.toStringAsFixed(0)} confirmed received. '
             'Safe travels!',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      );
     } catch (_) {}
   }
 
@@ -900,16 +941,16 @@ class BookingService {
 
     // 8. System message in conversation (best-effort)
     try {
-      await _firestore
-          .collection('conversations')
-          .doc(bookingId)
-          .collection('messages')
-          .add({
-        'type': 'system',
-        'text': '✅ Trip completed on ${_fmt(DateTime.now())}. '
+      final convId = '${carId}_$renterId';
+      await ChatService().updateConversationBookingStatus(
+        conversationId: convId,
+        bookingStatus: 'completed',
+      );
+      await ChatService().postSystemMessage(
+        conversationId: convId,
+        text: '✅ Trip completed on ${_fmt(DateTime.now())}. '
             'All cash settled. Thanks for using RozRides!',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      );
     } catch (_) {}
   }
 
@@ -1178,13 +1219,14 @@ class BookingService {
           .collection('reviews')
           .where('carId', isEqualTo: carId)
           .where('isPublic', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
           .get();
-      return snap.docs
+      final list = snap.docs
           .map((d) => ReviewModel.fromMap(d.data(), d.id))
           .toList();
-    } catch (_) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list.take(limit).toList();
+    } catch (e) {
+      debugPrint('Error fetching car reviews: $e');
       return [];
     }
   }
@@ -1198,13 +1240,14 @@ class BookingService {
           .where('revieweeId', isEqualTo: userId)
           .where('type', isEqualTo: type)
           .where('isPublic', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
           .get();
-      return snap.docs
+      final list = snap.docs
           .map((d) => ReviewModel.fromMap(d.data(), d.id))
           .toList();
-    } catch (_) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list.take(limit).toList();
+    } catch (e) {
+      debugPrint('Error fetching user reviews: $e');
       return [];
     }
   }

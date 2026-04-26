@@ -13,6 +13,8 @@ import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'my_listings_screen.dart';
 import 'add_listing_screen.dart';
+import 'chat/conversations_list_screen.dart';
+import '../providers/chat_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final bookingProvider = context.read<BookingProvider>();
         bookingProvider.listenToHostBookings(user.id);
         bookingProvider.listenToRenterBookings(user.id);
+        // Start listening to conversations for unread badge + inbox
+        context.read<ChatProvider>().listenToConversations(user.id);
       }
     });
   }
@@ -285,6 +289,17 @@ class _AppDrawer extends StatelessWidget {
               children: [
               // ── ACCOUNT ──────────────────────────────────────────────
                 _sectionLabel('Account'),
+                Consumer<ChatProvider>(
+                  builder: (context, chat, _) {
+                    final unread = chat.totalUnreadCount;
+                    return _DrawerTile(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      label: 'Messages',
+                      badgeCount: unread,
+                      onTap: () => _go(context, const ConversationsListScreen()),
+                    );
+                  },
+                ),
                 _DrawerTile(
                   icon: Icons.person_outline,
                   label: 'My Profile',
@@ -372,11 +387,13 @@ class _DrawerTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final int badgeCount;
 
   const _DrawerTile({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
@@ -385,6 +402,23 @@ class _DrawerTile extends StatelessWidget {
       leading: Icon(icon, color: Theme.of(context).primaryColor, size: 22),
       title: Text(label,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+      trailing: badgeCount > 0
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$badgeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
       onTap: onTap,
       horizontalTitleGap: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

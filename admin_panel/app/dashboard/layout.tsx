@@ -2,32 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase-client';
-import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus, ClipboardList, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus, ClipboardList, AlertTriangle, Star } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useRoleGuard } from '@/lib/hooks/useRoleGuard';
+import NotificationBell from '@/components/NotificationBell';
+import { auth } from '@/lib/firebase-client';
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const { user, isSuperAdmin, loading } = useRoleGuard();
     const router = useRouter();
     const pathname = usePathname();
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (!user) {
-                router.push('/login');
-            } else {
-                setLoading(false);
-            }
-        });
-
-        return () => unsubscribe();
-    }, [router]);
 
     const handleLogout = async () => {
         await auth.signOut();
@@ -52,8 +41,12 @@ export default function DashboardLayout({
         { href: '/dashboard/listings', label: 'Car Listings', icon: Car },
         { href: '/dashboard/bookings', label: 'Bookings', icon: ClipboardList },
         { href: '/dashboard/claims', label: 'Damage Claims', icon: AlertTriangle },
-        { href: '/dashboard/add-admin', label: 'Add Admin', icon: ShieldPlus },
+        { href: '/dashboard/reviews', label: 'Reviews', icon: Star },
     ];
+
+    if (isSuperAdmin) {
+        navItems.push({ href: '/dashboard/admins', label: 'Admins', icon: ShieldPlus });
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -107,7 +100,22 @@ export default function DashboardLayout({
             </aside>
 
             {/* Main Content */}
-            <main className="ml-64 min-h-screen">
+            <main className="ml-64 flex-1 flex flex-col min-h-screen">
+                {/* Top Navigation Bar */}
+                <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-8 sticky top-0 z-10">
+                    <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                        {navItems.find((item) => item.href === pathname)?.label || 'Dashboard'}
+                    </h1>
+                    <div className="flex items-center space-x-4">
+                        <NotificationBell />
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {user?.email}
+                            </span>
+                        </div>
+                    </div>
+                </header>
+
                 <div className="p-8">{children}</div>
             </main>
         </div>
