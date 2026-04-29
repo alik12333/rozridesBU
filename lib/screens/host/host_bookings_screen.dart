@@ -24,7 +24,7 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<AuthProvider>().currentUser;
       if (user != null) context.read<BookingProvider>().listenToHostBookings(user.id);
@@ -79,6 +79,7 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
                 ])),
                 const Tab(text: 'Upcoming'),
                 const Tab(text: 'Active'),
+                const Tab(text: 'Flagged'),
                 const Tab(text: 'Past'),
               ],
             ),
@@ -89,6 +90,7 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
               _BookingList(bookings: provider.hostPendingBookings, emptyMsg: ('No pending requests', 'Booking requests from renters will appear here.'), isHost: true),
               _BookingList(bookings: provider.hostConfirmedBookings, emptyMsg: ('No upcoming bookings', 'Confirmed bookings will appear here.'), isHost: true),
               _BookingList(bookings: provider.hostActiveBookings, emptyMsg: ('No active trips', 'Active rentals will appear here.'), isHost: true),
+              _BookingList(bookings: provider.hostFlaggedBookings, emptyMsg: ('No flagged trips', 'Trips under review will appear here.'), isHost: true),
               _BookingList(bookings: provider.hostPastBookings, emptyMsg: ('No past bookings', 'Completed and cancelled bookings appear here.'), isHost: true),
             ],
           ),

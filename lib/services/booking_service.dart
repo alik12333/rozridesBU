@@ -506,8 +506,8 @@ class BookingService {
       userId,
     );
 
-    // If was confirmed, remove date range from car
-    if (status == 'confirmed') {
+    // If was confirmed or active, remove date range from car
+    if (status == 'confirmed' || status == 'active' || status == 'flagged') {
       final carRef = _firestore.collection('listings').doc(carId);
       batch.update(carRef, {
         'bookedDateRanges': FieldValue.arrayRemove([
@@ -973,18 +973,14 @@ class BookingService {
 
   // ──────────────────────────── RAISE DISPUTE ────────────────────────────
 
-  Future<void> raiseDispute({
-    required BookingModel booking,
-    required String description,
-    required double renterBelievesAmount,
+  Future<String> flagTrip({
+    required String bookingId,
+    required String carId,
+    required String hostId,
+    required String renterId,
+    required double hostClaimedAmount,
+    PostTripInspection? postInspection,
   }) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) throw Exception('Not authenticated');
-
-    final bookingId = booking.id;
-    final preRef  = 'bookings/$bookingId/inspections/pre_trip';
-    final postRef = 'bookings/$bookingId/inspections/post_trip';
-
     final claimRef = _firestore.collection('damageClaims').doc();
     final bookingRef = _firestore.collection('bookings').doc(bookingId);
     final now = FieldValue.serverTimestamp();
@@ -992,16 +988,16 @@ class BookingService {
     final claim = DamageClaim(
       claimId: claimRef.id,
       bookingId: bookingId,
-      carId: booking.carId,
-      hostId: booking.hostId,
-      renterId: booking.renterId,
-      raisedBy: currentUser.uid,
-      description: description,
-      hostClaimedDeduction: booking.cashPayments['damageDeduction']?.toDouble() ?? 0,
-      renterAgreedDeduction: renterBelievesAmount,
-      preInspectionRef: preRef,
-      postInspectionRef: postRef,
+      carId: carId,
+      hostId: hostId,
+      renterId: renterId,
+      hostClaimedAmount: hostClaimedAmount,
+      status: 'open',
+      resolvedInFavorOf: null,
+      finalDeductionAmount: null,
+      adminNotes: null,
       createdAt: DateTime.now(),
+      resolvedAt: null,
     );
 
     final batch = _firestore.batch();
@@ -1009,43 +1005,79 @@ class BookingService {
     // 1. Write damage claim
     batch.set(claimRef, claim.toMap());
 
+    // 1b. Write post inspection if provided
+    if (postInspection != null) {
+      final updatedItems = <String, InspectionItem>{};
+      for (final entry in postInspection.items.entries) {
+        final area = entry.key;
+        final item = entry.value;
+        final uploadedUrls = <String>[];
+        for (int i = 0; i < item.photoUrls.length; i++) {
+          final path = item.photoUrls[i];
+          if (path.startsWith('http')) {
+            uploadedUrls.add(path);
+            continue;
+          }
+          try {
+            final file = File(path);
+            final ts = DateTime.now().millisecondsSinceEpoch;
+            final ref = FirebaseStorage.instance
+                .ref('inspections/$bookingId/post_trip/${area}_$ts.jpg');
+            await ref.putFile(file);
+            uploadedUrls.add(await ref.getDownloadURL());
+          } catch (_) {
+            uploadedUrls.add(path);
+          }
+        }
+        updatedItems[area] = item.copyWith(photoUrls: uploadedUrls);
+      }
+
+      final finalPost = postInspection.copyWith(
+          items: updatedItems, completedAt: DateTime.now());
+
+      final postRef = bookingRef.collection('inspections').doc('post_trip');
+      batch.set(postRef, finalPost.toMap());
+    }
+
     // 2. Update booking status
     batch.update(bookingRef, {
-      'status': 'disputed',
+      'status': 'flagged',
       'updatedAt': now,
     });
 
     // 3. Timeline event
     _addTimelineEvent(
-      batch, bookingId, 'disputed',
-      'Dispute raised by renter. Host claimed PKR ${claim.hostClaimedDeduction.toStringAsFixed(0)}. Renter believes correct amount is PKR ${renterBelievesAmount.toStringAsFixed(0)}.',
-      currentUser.uid,
+      batch,
+      bookingId,
+      'flagged',
+      'Renter flagged this trip for admin review. Host claimed PKR $hostClaimedAmount deduction.',
+      renterId,
     );
 
     // 4. Admin alert
     final adminAlertRef = _firestore.collection('adminAlerts').doc();
     batch.set(adminAlertRef, {
-      'type': 'damage_dispute',
+      'type': 'dispute',
+      'title': 'New Trip Flagged',
+      'body': 'A renter has flagged a trip for review. Booking $bookingId. Host claimed PKR $hostClaimedAmount.',
       'bookingId': bookingId,
       'claimId': claimRef.id,
-      'renterName': booking.renterName,
-      'hostId': booking.hostId,
-      'message': 'New dispute raised for booking $bookingId. Review required.',
+      'isRead': false,
       'createdAt': now,
-      'resolved': false,
+      'routeTo': '/dashboard/claims',
     });
 
     // 5. Notify host
     final hostNotifRef = _firestore
         .collection('users')
-        .doc(booking.hostId)
+        .doc(hostId)
         .collection('notifications')
         .doc();
     batch.set(hostNotifRef, {
-      'type': 'dispute_raised',
-      'title': 'Renter raised a dispute',
+      'type': 'trip_flagged',
+      'title': 'Trip Flagged for Review',
       'body':
-          'The renter has raised a dispute regarding the damage claim. RozRides admin will review and contact both parties.',
+          'The renter has asked RozRides to review the damage settlement for this trip. Admin will contact both parties.',
       'bookingId': bookingId,
       'isRead': false,
       'isUnread': true,
@@ -1053,6 +1085,7 @@ class BookingService {
     });
 
     await batch.commit();
+    return claimRef.id;
   }
 
   // ──────────────────────────── SUBMIT REVIEW ────────────────────────────

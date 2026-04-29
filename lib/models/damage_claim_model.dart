@@ -6,19 +6,13 @@ class DamageClaim {
   final String carId;
   final String hostId;
   final String renterId;
-  final String raisedBy;
-  final String claimType;
-  final String description;
-  final double hostClaimedDeduction;
-  final double renterAgreedDeduction;
-  final String preInspectionRef;
-  final String postInspectionRef;
-  final String status; // open | admin_reviewing | resolved_for_host | resolved_for_renter | resolved_mutually
+  final double hostClaimedAmount;
+  final String status; // 'open' | 'admin_reviewing' | 'resolved'
+  final String? resolvedInFavorOf; // 'host' | 'renter' | 'split'
+  final double? finalDeductionAmount;
   final String? adminNotes;
-  final double? mutualAmount;
-  final DateTime? resolvedAt;
-  final String? resolvedBy;
   final DateTime createdAt;
+  final DateTime? resolvedAt;
 
   const DamageClaim({
     required this.claimId,
@@ -26,19 +20,13 @@ class DamageClaim {
     required this.carId,
     required this.hostId,
     required this.renterId,
-    required this.raisedBy,
-    this.claimType = 'damage_dispute',
-    required this.description,
-    required this.hostClaimedDeduction,
-    this.renterAgreedDeduction = 0,
-    required this.preInspectionRef,
-    required this.postInspectionRef,
+    required this.hostClaimedAmount,
     this.status = 'open',
+    this.resolvedInFavorOf,
+    this.finalDeductionAmount,
     this.adminNotes,
-    this.mutualAmount,
-    this.resolvedAt,
-    this.resolvedBy,
     required this.createdAt,
+    this.resolvedAt,
   });
 
   Map<String, dynamic> toMap() => {
@@ -47,20 +35,13 @@ class DamageClaim {
         'carId': carId,
         'hostId': hostId,
         'renterId': renterId,
-        'raisedBy': raisedBy,
-        'claimType': claimType,
-        'description': description,
-        'hostClaimedDeduction': hostClaimedDeduction,
-        'renterAgreedDeduction': renterAgreedDeduction,
-        'preInspectionRef': preInspectionRef,
-        'postInspectionRef': postInspectionRef,
+        'hostClaimedAmount': hostClaimedAmount,
         'status': status,
+        'resolvedInFavorOf': resolvedInFavorOf,
+        'finalDeductionAmount': finalDeductionAmount,
         'adminNotes': adminNotes,
-        'mutualAmount': mutualAmount,
-        'resolvedAt':
-            resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
-        'resolvedBy': resolvedBy,
         'createdAt': Timestamp.fromDate(createdAt),
+        'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
       };
 
   factory DamageClaim.fromMap(Map<String, dynamic> map, String id) =>
@@ -70,39 +51,27 @@ class DamageClaim {
         carId: map['carId'] as String? ?? '',
         hostId: map['hostId'] as String? ?? '',
         renterId: map['renterId'] as String? ?? '',
-        raisedBy: map['raisedBy'] as String? ?? '',
-        claimType: map['claimType'] as String? ?? 'damage_dispute',
-        description: map['description'] as String? ?? '',
-        hostClaimedDeduction:
-            (map['hostClaimedDeduction'] ?? 0).toDouble(),
-        renterAgreedDeduction:
-            (map['renterAgreedDeduction'] ?? 0).toDouble(),
-        preInspectionRef: map['preInspectionRef'] as String? ?? '',
-        postInspectionRef: map['postInspectionRef'] as String? ?? '',
+        hostClaimedAmount: (map['hostClaimedAmount'] ?? 0).toDouble(),
         status: map['status'] as String? ?? 'open',
+        resolvedInFavorOf: map['resolvedInFavorOf'] as String?,
+        finalDeductionAmount: map['finalDeductionAmount'] != null
+            ? (map['finalDeductionAmount'] as num).toDouble()
+            : null,
         adminNotes: map['adminNotes'] as String?,
-        mutualAmount: map['mutualAmount'] != null
-            ? (map['mutualAmount']).toDouble()
-            : null,
-        resolvedAt: map['resolvedAt'] != null
-            ? (map['resolvedAt'] as Timestamp).toDate()
-            : null,
-        resolvedBy: map['resolvedBy'] as String?,
         createdAt: map['createdAt'] != null
             ? (map['createdAt'] as Timestamp).toDate()
             : DateTime.now(),
+        resolvedAt: map['resolvedAt'] != null
+            ? (map['resolvedAt'] as Timestamp).toDate()
+            : null,
       );
 
   String get statusLabel {
     switch (status) {
       case 'admin_reviewing':
         return 'Under Review';
-      case 'resolved_for_host':
-        return 'Resolved — Host';
-      case 'resolved_for_renter':
-        return 'Resolved — Renter';
-      case 'resolved_mutually':
-        return 'Resolved Mutually';
+      case 'resolved':
+        return 'Resolved';
       default:
         return 'Open';
     }

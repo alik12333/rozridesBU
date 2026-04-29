@@ -277,7 +277,10 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           const SizedBox(height: 14),
           _cashItem('At pickup: Security deposit', _pkr(booking.securityDeposit), depositPaid),
           _cashItem('At return: Car rental payment', _pkr(booking.totalRent), rentPaid),
-          _cashItem('At return: Deposit refund to renter', _pkr(booking.securityDeposit), depositRefunded),
+          if (booking.status == 'flagged')
+            _cashItem('At return: Deposit refund', '⏳ Pending admin decision', false)
+          else
+            _cashItem('At return: Deposit refund to renter', _pkr(booking.securityDeposit), depositRefunded),
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -371,6 +374,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost) {
+    if (booking.status == 'flagged') {
+      return Container(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))],
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.purple.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.purple.shade200),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.gavel, color: Colors.purple.shade600),
+              const SizedBox(height: 8),
+              Text(
+                'This trip is under review. RozRides admin will notify you of the outcome within 24 hours.\n\nDo not exchange any cash until you receive the admin\'s decision.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.purple.shade900, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final List<Widget> buttons = [];
 
     if (isHost) {

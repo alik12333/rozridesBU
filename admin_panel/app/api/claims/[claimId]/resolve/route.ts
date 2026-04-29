@@ -3,10 +3,13 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 
 interface ResolveBody {
-    resolution: 'resolved_for_host' | 'resolved_for_renter' | 'resolved_mutually';
+    bookingId: string;
+    resolvedInFavorOf: 'host' | 'renter' | 'split';
+    finalDeductionAmount: number;
     adminNotes?: string;
-    mutualAmount?: number;
-    adminId?: string;
+    hostId: string;
+    renterId: string;
+    depositAmount?: number;
 }
 
 export async function POST(
@@ -15,94 +18,96 @@ export async function POST(
 ) {
     const { claimId } = params;
     const body: ResolveBody = await request.json();
-    const { resolution, adminNotes, mutualAmount, adminId } = body;
+    const { bookingId, resolvedInFavorOf, finalDeductionAmount, adminNotes, hostId, renterId, depositAmount } = body;
 
-    if (!resolution) {
-        return NextResponse.json({ error: 'resolution is required' }, { status: 400 });
+    if (!resolvedInFavorOf || finalDeductionAmount === undefined) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     try {
         const claimRef = adminDb.collection('damageClaims').doc(claimId);
-        const claimSnap = await claimRef.get();
-
-        if (!claimSnap.exists) {
-            return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
+        const bookingRef = adminDb.collection('bookings').doc(bookingId);
+        const bookingSnap = await bookingRef.get();
+        
+        if (!bookingSnap.exists) {
+            return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
         }
-
-        const claim = claimSnap.data()!;
+        
+        const bookingData = bookingSnap.data()!;
         const now = FieldValue.serverTimestamp();
+
         const batch = adminDb.batch();
 
-        // 1. Update claim status
+        // 1. Update Claim
         batch.update(claimRef, {
-            status: resolution,
+            status: 'resolved',
+            resolvedInFavorOf,
+            finalDeductionAmount,
             adminNotes: adminNotes ?? null,
-            mutualAmount: mutualAmount ?? null,
             resolvedAt: now,
-            resolvedBy: adminId ?? 'admin',
         });
 
-        // 2. If booking was disputed, revert to completed
-        const bookingRef = adminDb.collection('bookings').doc(claim.bookingId);
-        const bookingSnap = await bookingRef.get();
-        if (bookingSnap.exists && bookingSnap.data()?.status === 'disputed') {
-            batch.update(bookingRef, {
-                status: 'completed',
-                updatedAt: now,
-            });
+        // 2. Update Booking Status (from 'flagged' to 'completed')
+        batch.update(bookingRef, {
+            status: 'completed',
+            updatedAt: now,
+        });
 
-            // Timeline event
-            const timelineRef = bookingRef.collection('timeline').doc();
-            batch.set(timelineRef, {
-                status: 'completed',
-                note: `Dispute resolved by admin. Resolution: ${resolution.replace(/_/g, ' ')}.${adminNotes ? ` Notes: ${adminNotes}` : ''}`,
-                triggeredBy: adminId ?? 'admin',
-                timestamp: now,
+        // 2b. Remove date range from car schedule
+        if (bookingData.carId && bookingData.startDate && bookingData.endDate) {
+            const carRef = adminDb.collection('listings').doc(bookingData.carId);
+            batch.update(carRef, {
+                bookedDateRanges: FieldValue.arrayRemove({
+                    start: bookingData.startDate,
+                    end: bookingData.endDate,
+                    bookingId: bookingId
+                })
             });
         }
 
-        // 3. Resolve message per outcome
-        const renterMessage =
-            resolution === 'resolved_for_host'
-                ? 'The admin has reviewed your dispute and resolved it in favor of the host. The agreed deduction will be applied.'
-                : resolution === 'resolved_for_renter'
-                ? 'The admin has reviewed your dispute and resolved it in your favor. No additional deduction will be applied.'
-                : `The admin has resolved the dispute mutually. A deduction of PKR ${mutualAmount ?? 0} has been agreed upon.`;
+        // 3. Timeline event
+        const timelineRef = bookingRef.collection('timeline').doc();
+        batch.set(timelineRef, {
+            status: 'completed',
+            note: `Admin has resolved this flagged trip. Final deduction: PKR ${finalDeductionAmount}. ${adminNotes || ''}`,
+            timestamp: now,
+        });
 
-        const hostMessage =
-            resolution === 'resolved_for_host'
-                ? 'The admin has reviewed the dispute and resolved it in your favor. Your claimed deduction has been upheld.'
-                : resolution === 'resolved_for_renter'
-                ? 'The admin has reviewed the dispute and resolved it in favor of the renter.'
-                : `The admin has resolved the dispute mutually. A deduction of PKR ${mutualAmount ?? 0} has been agreed upon.`;
+        // 4. Determine notifications
+        let renterMessage = '';
+        let hostMessage = '';
+        const title = 'Trip Review Finalized';
 
-        // 4. Notify renter
-        const renterNotifRef = adminDb
-            .collection('users')
-            .doc(claim.renterId)
-            .collection('notifications')
-            .doc();
+        if (resolvedInFavorOf === 'host') {
+            renterMessage = `RozRides has completed the review of your trip. The decision is in favor of the host. A deduction of PKR ${finalDeductionAmount} has been applied. Please complete your cash exchange.`;
+            hostMessage = `RozRides has completed the review of the trip. The decision is in your favor. You are authorized to keep a deduction of PKR ${finalDeductionAmount}.`;
+        } else if (resolvedInFavorOf === 'renter') {
+            renterMessage = `RozRides has completed the review of your trip. The decision is in your favor. Your full deposit must be returned. Please complete your cash exchange.`;
+            hostMessage = `RozRides has completed the review of the trip. The decision is in favor of the renter. You must return the full deposit to the renter.`;
+        } else {
+            renterMessage = `RozRides has resolved the flagged trip with a split decision. The host will keep PKR ${finalDeductionAmount} from the deposit. Please complete your cash exchange.`;
+            hostMessage = `RozRides has resolved the flagged trip with a split decision. You are authorized to keep PKR ${finalDeductionAmount} from the deposit.`;
+        }
+
+        // 5. Notify renter
+        const renterNotifRef = adminDb.collection('users').doc(renterId).collection('notifications').doc();
         batch.set(renterNotifRef, {
-            type: 'dispute_resolved',
-            title: 'Dispute Resolved',
+            type: 'trip_resolved',
+            title,
             body: renterMessage,
-            bookingId: claim.bookingId,
+            bookingId: bookingId,
             isRead: false,
             isUnread: true,
             createdAt: now,
         });
 
-        // 5. Notify host
-        const hostNotifRef = adminDb
-            .collection('users')
-            .doc(claim.hostId)
-            .collection('notifications')
-            .doc();
+        // 6. Notify host
+        const hostNotifRef = adminDb.collection('users').doc(hostId).collection('notifications').doc();
         batch.set(hostNotifRef, {
-            type: 'dispute_resolved',
-            title: 'Dispute Resolved',
+            type: 'trip_resolved',
+            title,
             body: hostMessage,
-            bookingId: claim.bookingId,
+            bookingId: bookingId,
             isRead: false,
             isUnread: true,
             createdAt: now,

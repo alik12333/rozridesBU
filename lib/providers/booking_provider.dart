@@ -38,6 +38,8 @@ class BookingProvider extends ChangeNotifier {
               b.status == 'rejected' ||
               b.status == 'expired')
           .toList();
+  List<BookingModel> get flaggedBookings =>
+      _renterBookings.where((b) => b.status == 'flagged').toList();
 
   // Renter tab groupings per spec (Upcoming, Active, Past)
   List<BookingModel> get upcomingBookings =>
@@ -59,6 +61,8 @@ class BookingProvider extends ChangeNotifier {
       _hostAllBookings.where((b) => b.status == 'confirmed').toList();
   List<BookingModel> get hostActiveBookings =>
       _hostAllBookings.where((b) => b.status == 'active').toList();
+  List<BookingModel> get hostFlaggedBookings =>
+      _hostAllBookings.where((b) => b.status == 'flagged').toList();
   List<BookingModel> get hostPastBookings =>
       _hostAllBookings
           .where((b) =>

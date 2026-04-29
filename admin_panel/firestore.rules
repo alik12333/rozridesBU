@@ -8,7 +8,11 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             (
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['admin', 'super_admin'] ||
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', {}).get('isAdmin', false) == true
+             );
     }
 
     match /users/{userId} {
@@ -83,7 +87,8 @@ service cloud.firestore {
       match /inspections/{inspectionId} {
         allow read: if isAuthenticated() && (
           get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid ||
-          get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid ||
+          isAdmin()
         );
         allow create, update: if isAuthenticated() &&
           get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid;

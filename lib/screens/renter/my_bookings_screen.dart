@@ -18,7 +18,7 @@ class MyBookingsScreen extends StatefulWidget {
 class _MyBookingsScreenState extends State<MyBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  static const _tabs = ['Upcoming', 'Active', 'Past'];
+  static const _tabs = ['Upcoming', 'Active', 'Flagged', 'Past'];
 
   @override
   void initState() {
@@ -40,7 +40,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     switch (i) {
       case 0: return p.upcomingBookings;
       case 1: return p.activeBookings;
-      case 2: return p.pastBookings;
+      case 2: return p.flaggedBookings;
+      case 3: return p.pastBookings;
       default: return [];
     }
   }
@@ -87,6 +88,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     const msgs = [
       ('No upcoming bookings', 'Pending and confirmed bookings will appear here.'),
       ('No active trips', 'Your current rentals will appear here.'),
+      ('No flagged trips', 'Trips under review will appear here.'),
       ('No past bookings', 'Completed and expired bookings will appear here.'),
     ];
     return Center(
@@ -136,6 +138,7 @@ class _BookingCardState extends State<_BookingCard> {
       case 'pending':   return const Color(0xFF7C3AED);
       case 'confirmed': return Colors.green;
       case 'active':    return Colors.blue;
+      case 'flagged':   return Colors.purple;
       case 'completed': return Colors.blueGrey;
       case 'rejected':
       case 'expired':   return Colors.red;
@@ -149,6 +152,7 @@ class _BookingCardState extends State<_BookingCard> {
       case 'pending':   return Icons.hourglass_top_rounded;
       case 'confirmed': return Icons.check_circle_rounded;
       case 'active':    return Icons.directions_car_rounded;
+      case 'flagged':   return Icons.gavel_rounded;
       case 'completed': return Icons.done_all_rounded;
       case 'rejected':  return Icons.cancel_rounded;
       case 'expired':   return Icons.timer_off_rounded;
@@ -162,6 +166,7 @@ class _BookingCardState extends State<_BookingCard> {
       case 'pending':   return 'Awaiting Host Response';
       case 'confirmed': return 'Confirmed — Ready to Go!';
       case 'active':    return 'Trip In Progress';
+      case 'flagged':   return 'Under Review';
       case 'completed': return 'Completed';
       case 'rejected':  return 'Declined by Host';
       case 'expired':   return 'Expired — No Response';
@@ -311,6 +316,7 @@ class _BookingCardState extends State<_BookingCard> {
       case 'rejected':
       case 'expired':
       case 'cancelled':
+      case 'flagged':
         primary = _fillBtn('View Details', Colors.grey.shade600, () =>
             Navigator.push(context, MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id))));
         break;

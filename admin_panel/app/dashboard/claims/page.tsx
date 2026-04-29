@@ -1,15 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, CheckCircle, XCircle, Handshake } from 'lucide-react';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
     Table,
     TableBody,
@@ -18,100 +12,92 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { db } from '@/lib/firebase-client';
+import { collection, onSnapshot, query, orderBy, doc, getDoc } from 'firebase/firestore';
 
 interface DamageClaim {
-    id: string;
+    claimId: string;
     bookingId: string;
     carId: string;
-    renterName: string;
-    hostName: string;
     renterId: string;
     hostId: string;
-    description: string;
-    hostClaimedDeduction: number;
-    renterAgreedDeduction: number;
+    hostClaimedAmount: number;
     status: string;
-    adminNotes: string | null;
-    mutualAmount: number | null;
-    preInspectionRef: string;
-    postInspectionRef: string;
-    resolvedAt: string | null;
-    createdAt: string;
+    createdAt: Date;
+    
+    // Joined data
+    carName?: string;
+    renterName?: string;
+    hostName?: string;
 }
 
 export default function ClaimsPage() {
+    const router = useRouter();
     const [claims, setClaims] = useState<DamageClaim[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selected, setSelected] = useState<DamageClaim | null>(null);
-    const [processing, setProcessing] = useState<string | null>(null);
-    const [adminNotes, setAdminNotes] = useState('');
-    const [mutualAmount, setMutualAmount] = useState('');
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
-        fetchClaims();
-    }, []);
+        const unsubscribe = onSnapshot(
+            collection(db, 'damageClaims'),
+            async (snapshot) => {
+                const claimsData = snapshot.docs.map(doc => ({
+                    claimId: doc.id,
+                    ...doc.data(),
+                    createdAt: doc.data().createdAt?.toDate() || new Date(),
+                })) as DamageClaim[];
 
-    const fetchClaims = async () => {
-        try {
-            const res = await fetch('/api/claims');
-            const data = await res.json();
-            setClaims(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Error fetching claims:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+                // Fetch joined data
+                const enrichedClaims = await Promise.all(claimsData.map(async (claim) => {
+                    let carName = 'Unknown';
+                    let renterName = 'Unknown';
+                    let hostName = 'Unknown';
 
-    const handleResolve = async (
-        resolution: 'resolved_for_host' | 'resolved_for_renter' | 'resolved_mutually'
-    ) => {
-        if (!selected) return;
-        if (resolution === 'resolved_mutually' && !mutualAmount) {
-            alert('Please enter the mutual settlement amount.');
-            return;
-        }
-        setProcessing(resolution);
-        try {
-            const res = await fetch(`/api/claims/${selected.id}/resolve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    resolution,
-                    adminNotes,
-                    mutualAmount: mutualAmount ? parseFloat(mutualAmount) : undefined,
-                }),
-            });
-            if (res.ok) {
-                await fetchClaims();
-                setSelected(prev =>
-                    prev ? { ...prev, status: resolution } : null
-                );
-            } else {
-                alert('Failed to resolve claim.');
+                    try {
+                        const bookingSnap = await getDoc(doc(db, 'bookings', claim.bookingId));
+                        if (bookingSnap.exists()) {
+                            carName = bookingSnap.data().carName || 'Unknown';
+                            renterName = bookingSnap.data().renterName || 'Unknown';
+                        }
+                        
+                        const hostSnap = await getDoc(doc(db, 'users', claim.hostId));
+                        if (hostSnap.exists()) {
+                            hostName = hostSnap.data().fullName || 'Unknown';
+                        }
+                    } catch (e) {
+                        console.error('Error fetching joined data', e);
+                    }
+
+                    return {
+                        ...claim,
+                        carName,
+                        renterName,
+                        hostName
+                    };
+                }));
+
+                setClaims(enrichedClaims);
+                setLoading(false);
+            },
+            (error) => {
+                console.error("Error fetching claims:", error);
+                setLoading(false);
             }
-        } catch (error) {
-            console.error('Error resolving:', error);
-        } finally {
-            setProcessing(null);
-        }
-    };
+        );
+
+        return () => unsubscribe();
+    }, []);
 
     const getStatusBadge = (status: string) => {
         const map: Record<string, string> = {
-            open: 'bg-orange-100 text-orange-700 border-orange-200',
-            admin_reviewing: 'bg-blue-100 text-blue-700 border-blue-200',
-            resolved_for_host: 'bg-green-100 text-green-700 border-green-200',
-            resolved_for_renter: 'bg-teal-100 text-teal-700 border-teal-200',
-            resolved_mutually: 'bg-purple-100 text-purple-700 border-purple-200',
+            open: 'bg-red-100 text-red-700 border-red-200',
+            admin_reviewing: 'bg-orange-100 text-orange-700 border-orange-200',
+            resolved: 'bg-green-100 text-green-700 border-green-200',
         };
         const label: Record<string, string> = {
             open: 'Open',
-            admin_reviewing: 'Under Review',
-            resolved_for_host: 'Host Won',
-            resolved_for_renter: 'Renter Won',
-            resolved_mutually: 'Mutual',
+            admin_reviewing: 'Reviewing',
+            resolved: 'Resolved',
         };
         return (
             <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full border ${map[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -120,8 +106,21 @@ export default function ClaimsPage() {
         );
     };
 
-    const filtered = claims.filter(c => filter === 'all' ? true : c.status === filter);
-    const isResolved = (s: string) => s.startsWith('resolved_');
+    // Sort order: open -> admin_reviewing -> resolved
+    const statusOrder: Record<string, number> = {
+        'open': 1,
+        'admin_reviewing': 2,
+        'resolved': 3
+    };
+
+    const sortedClaims = [...claims].sort((a, b) => {
+        const orderA = statusOrder[a.status] || 99;
+        const orderB = statusOrder[b.status] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
+    const filtered = sortedClaims.filter(c => filter === 'all' ? true : c.status === filter);
 
     if (loading) return <div className="text-center py-8">Loading Claims...</div>;
 
@@ -134,7 +133,7 @@ export default function ClaimsPage() {
 
             {/* Filter pills */}
             <div className="flex gap-2 flex-wrap">
-                {['all', 'open', 'admin_reviewing', 'resolved_for_host', 'resolved_for_renter', 'resolved_mutually'].map(f => (
+                {['all', 'open', 'admin_reviewing', 'resolved'].map(f => (
                     <Button
                         key={f}
                         variant={filter === f ? 'default' : 'outline'}
@@ -152,12 +151,12 @@ export default function ClaimsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Claim ID</TableHead>
-                            <TableHead>Booking</TableHead>
+                            <TableHead>Car Name</TableHead>
                             <TableHead>Renter</TableHead>
                             <TableHead>Host</TableHead>
                             <TableHead>Host Claimed</TableHead>
+                            <TableHead>Date Flagged</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Date</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -165,30 +164,26 @@ export default function ClaimsPage() {
                         {filtered.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                    No claims found.
+                                    No open disputes. The platform is running smoothly.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             filtered.map(claim => (
-                                <TableRow key={claim.id}>
-                                    <TableCell className="font-mono text-xs">{claim.id.slice(0, 8)}…</TableCell>
-                                    <TableCell className="font-mono text-xs">{claim.bookingId.slice(0, 8)}…</TableCell>
+                                <TableRow key={claim.claimId}>
+                                    <TableCell className="font-mono text-xs">{claim.claimId.slice(0, 8)}</TableCell>
+                                    <TableCell>{claim.carName}</TableCell>
                                     <TableCell>{claim.renterName}</TableCell>
                                     <TableCell>{claim.hostName}</TableCell>
-                                    <TableCell className="font-bold text-red-600">PKR {claim.hostClaimedDeduction.toLocaleString()}</TableCell>
-                                    <TableCell>{getStatusBadge(claim.status)}</TableCell>
+                                    <TableCell className="font-bold text-red-600">PKR {claim.hostClaimedAmount?.toLocaleString()}</TableCell>
                                     <TableCell className="text-sm text-muted-foreground">
-                                        {new Date(claim.createdAt).toLocaleDateString()}
+                                        {claim.createdAt.toLocaleDateString()}
                                     </TableCell>
+                                    <TableCell>{getStatusBadge(claim.status)}</TableCell>
                                     <TableCell className="text-right">
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            onClick={() => {
-                                                setSelected(claim);
-                                                setAdminNotes(claim.adminNotes ?? '');
-                                                setMutualAmount(claim.mutualAmount?.toString() ?? '');
-                                            }}
+                                            onClick={() => router.push(`/dashboard/claims/${claim.claimId}`)}
                                         >
                                             <Eye className="w-4 h-4 mr-2" />
                                             Review
@@ -200,125 +195,6 @@ export default function ClaimsPage() {
                     </TableBody>
                 </Table>
             </div>
-
-            {/* Detail Dialog */}
-            <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Claim Review: {selected?.id}</DialogTitle>
-                    </DialogHeader>
-                    {selected && (
-                        <div className="space-y-6">
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                                <div><p className="text-xs text-muted-foreground uppercase">Renter</p><p className="font-medium text-sm">{selected.renterName}</p></div>
-                                <div><p className="text-xs text-muted-foreground uppercase">Host</p><p className="font-medium text-sm">{selected.hostName}</p></div>
-                                <div><p className="text-xs text-muted-foreground uppercase">Host Claimed</p><p className="font-bold text-red-600 text-sm">PKR {selected.hostClaimedDeduction.toLocaleString()}</p></div>
-                                <div><p className="text-xs text-muted-foreground uppercase">Renter Believes</p><p className="font-bold text-teal-600 text-sm">PKR {selected.renterAgreedDeduction.toLocaleString()}</p></div>
-                            </div>
-
-                            {/* Renter's Account */}
-                            <div>
-                                <h3 className="text-base font-bold mb-2">Renter&apos;s Account</h3>
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{selected.description}</p>
-                                </div>
-                            </div>
-
-                            {/* Inspection References */}
-                            <div>
-                                <h3 className="text-base font-bold mb-2">Inspection References</h3>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div className="bg-gray-50 border rounded-lg p-3">
-                                        <p className="text-xs text-muted-foreground uppercase mb-1">Pre-Trip Ref</p>
-                                        <p className="font-mono text-xs break-all">{selected.preInspectionRef}</p>
-                                    </div>
-                                    <div className="bg-gray-50 border rounded-lg p-3">
-                                        <p className="text-xs text-muted-foreground uppercase mb-1">Post-Trip Ref</p>
-                                        <p className="font-mono text-xs break-all">{selected.postInspectionRef}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Status */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold">Current Status:</span>
-                                {getStatusBadge(selected.status)}
-                            </div>
-
-                            {/* Resolution Panel */}
-                            {!isResolved(selected.status) && (
-                                <div className="border-t pt-6 bg-amber-50/50 dark:bg-amber-950/20 p-4 rounded-lg border-amber-100">
-                                    <h3 className="text-base font-bold text-amber-800 dark:text-amber-300 mb-4">Issue Resolution</h3>
-
-                                    <div className="space-y-4">
-                                        {/* Admin notes */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Admin Notes (optional)</label>
-                                            <textarea
-                                                rows={3}
-                                                className="w-full text-sm rounded-md border border-gray-300 px-3 py-2"
-                                                placeholder="Reasoning for this decision, evidence reviewed, etc."
-                                                value={adminNotes}
-                                                onChange={e => setAdminNotes(e.target.value)}
-                                            />
-                                        </div>
-
-                                        {/* Mutual amount */}
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1">Mutual Settlement Amount (PKR) — for &quot;Resolve Mutually&quot;</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                className="w-full md:w-48 text-sm rounded-md border border-gray-300 px-3 py-2"
-                                                placeholder="e.g., 2500"
-                                                value={mutualAmount}
-                                                onChange={e => setMutualAmount(e.target.value)}
-                                            />
-                                        </div>
-
-                                        {/* Resolution buttons */}
-                                        <div className="flex flex-wrap gap-3">
-                                            <Button
-                                                className="bg-green-600 hover:bg-green-700 text-white"
-                                                disabled={processing !== null}
-                                                onClick={() => handleResolve('resolved_for_host')}
-                                            >
-                                                <CheckCircle className="w-4 h-4 mr-2" />
-                                                {processing === 'resolved_for_host' ? 'Processing…' : 'Resolve for Host'}
-                                            </Button>
-                                            <Button
-                                                className="bg-teal-600 hover:bg-teal-700 text-white"
-                                                disabled={processing !== null}
-                                                onClick={() => handleResolve('resolved_for_renter')}
-                                            >
-                                                <XCircle className="w-4 h-4 mr-2" />
-                                                {processing === 'resolved_for_renter' ? 'Processing…' : 'Resolve for Renter'}
-                                            </Button>
-                                            <Button
-                                                className="bg-purple-600 hover:bg-purple-700 text-white"
-                                                disabled={processing !== null}
-                                                onClick={() => handleResolve('resolved_mutually')}
-                                            >
-                                                <Handshake className="w-4 h-4 mr-2" />
-                                                {processing === 'resolved_mutually' ? 'Processing…' : 'Resolve Mutually'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Already resolved */}
-                            {isResolved(selected.status) && selected.adminNotes && (
-                                <div className="bg-gray-50 border rounded-lg p-4">
-                                    <p className="text-xs text-muted-foreground uppercase mb-1">Admin Notes</p>
-                                    <p className="text-sm text-gray-700">{selected.adminNotes}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

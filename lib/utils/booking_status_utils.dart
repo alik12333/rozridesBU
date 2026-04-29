@@ -9,7 +9,7 @@ Color getStatusColor(String status) {
     case 'cancelled': return Colors.red;
     case 'rejected': return Colors.red;
     case 'expired': return Colors.red;
-    case 'disputed': return Colors.purple;
+    case 'flagged': return Colors.purple;
     default: return Colors.grey;
   }
 }
@@ -23,7 +23,7 @@ String getStatusLabel(String status) {
     case 'cancelled': return '✗ Cancelled';
     case 'rejected': return '✗ Declined by Host';
     case 'expired': return '✗ Request Expired';
-    case 'disputed': return '⚠ Under Review';
+    case 'flagged': return '⚠ Under Review';
     default: return 'Unknown';
   }
 }
@@ -44,8 +44,8 @@ String getStatusDescription(String status) {
       return 'Host declined this request';
     case 'expired':
       return 'Host did not respond in time';
-    case 'disputed':
-      return 'RozRides support is reviewing this trip';
+    case 'flagged':
+      return 'RozRides is reviewing this trip. You will be notified of the outcome.';
     default:
       return '';
   }

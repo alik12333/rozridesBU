@@ -6,7 +6,7 @@ import '../../models/booking_model.dart';
 import '../../models/inspection_model.dart';
 import '../../models/post_inspection_model.dart';
 import '../../services/booking_service.dart';
-import '../booking/dispute_screen.dart';
+import 'trip_flagged_screen.dart';
 
 class CashSettlementScreen extends StatefulWidget {
   final BookingModel booking;
@@ -62,6 +62,60 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
           backgroundColor: Color(0xFF16A34A),
           behavior: SnackBarBehavior.floating,
         ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  Future<void> _flagTrip() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Report this trip?'),
+        content: const Text(
+            'Are you sure you want to report this trip?\n\n'
+            'RozRides admin will review the inspection photos and your conversation with the host.\n'
+            'You will be notified of the outcome.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Yes, Report'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _submitting = true);
+    try {
+      await _service.flagTrip(
+        bookingId: widget.booking.id,
+        carId: widget.booking.carId,
+        hostId: widget.booking.hostId,
+        renterId: widget.booking.renterId,
+        hostClaimedAmount: _deduction,
+        postInspection: widget.postInspection,
+      );
+      if (mounted) {
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (_) => const TripFlaggedScreen()));
       }
     } catch (e) {
       if (mounted) {
@@ -325,28 +379,38 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            // Dispute stub
+            const Divider(height: 32),
+            Text("Don't agree with this claim?",
+                style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            // Report to RozRides stub
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 icon: const Icon(Icons.flag_outlined),
-                label: const Text('RAISE A DISPUTE WITH ROZRIDES'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DisputeScreen(
-                      booking: widget.booking,
-                      hostClaimedDeduction: _deduction,
-                    ),
-                  ),
-                ),
+                label: const Text('REPORT THIS TRIP TO ROZRIDES'),
+                onPressed: _submitting ? null : _flagTrip,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade600,
-                  side: BorderSide(color: Colors.red.shade300),
+                  foregroundColor: Colors.amber.shade800,
+                  side: BorderSide(color: Colors.amber.shade400),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tapping report sends this trip for admin review. RozRides will contact both parties within 24 hours.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, height: 1.4),
+                  ),
+                ),
+              ],
             ),
           ]),
         ),
