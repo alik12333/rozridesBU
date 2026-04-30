@@ -327,6 +327,7 @@ export async function getAllBookings(): Promise<Booking[]> {
             return {
                 id: doc.id,
                 ...data,
+                totalAmount: data.totalAmount ?? data.totalRent ?? 0,
                 startDate: data.startDate?.toDate() || new Date(),
                 endDate: data.endDate?.toDate() || new Date(),
                 createdAt: data.createdAt?.toDate() || new Date(),
