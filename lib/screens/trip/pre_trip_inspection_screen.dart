@@ -135,14 +135,15 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
         hostSigned: true,
         renterSigned: true,
       );
-      await _service.startTrip(widget.booking.id, finalInspection);
+      await _service.completePreHandover(widget.booking.id, finalInspection);
       if (mounted) {
         Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == '/');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🚗 Trip started! Drive safe.'),
-            backgroundColor: Color(0xFF16A34A),
+            content: Text('✅ Handover complete! Waiting for the renter to start the trip.'),
+            backgroundColor: Color(0xFF7C3AED),
             behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
           ),
         );
       }
@@ -502,8 +503,27 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
               ),
               child: _submitting
                   ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                  : const Text('COMPLETE HANDOVER — START TRIP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  : const Text('COMPLETE HANDOVER', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.purple.shade200),
+            ),
+            child: Row(children: [
+              Icon(Icons.info_outline, color: Colors.purple.shade600, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'After completing, the renter will see a "Start Trip" button on their device.',
+                  style: TextStyle(color: Colors.purple.shade800, fontSize: 12, height: 1.4),
+                ),
+              ),
+            ]),
           ),
           const SizedBox(height: 20),
         ]),

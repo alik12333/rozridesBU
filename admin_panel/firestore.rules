@@ -58,7 +58,8 @@ service cloud.firestore {
         (
           resource.data.renterId == request.auth.uid &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'cancellationReason', 'updatedAt'])
+            .hasOnly(['status', 'cancellationReason', 'updatedAt', 
+                      'tripStartedAt', 'tripEndedAt', 'cashPayments'])
         ) ||
         // Host can accept, decline, start trip (status → active), close trip (status → completed)
         (
@@ -66,7 +67,9 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'rejectionReason', 'updatedAt',
                       'bookedDateRanges', 'warningNotificationSent',
-                      'tripStartedAt', 'tripEndedAt', 'cashPayments'])
+                      'tripStartedAt', 'tripEndedAt', 'cashPayments',
+                      'preHandoverCompleted', 'postHandoverCompleted', 
+                      'proposedSettlement'])
         ) ||
         // Review status updates (either party submitting review)
         (
@@ -90,8 +93,10 @@ service cloud.firestore {
           get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid ||
           isAdmin()
         );
-        allow create, update: if isAuthenticated() &&
-          get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid;
+        allow create, update: if isAuthenticated() && (
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.hostId == request.auth.uid ||
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.renterId == request.auth.uid
+        );
         allow delete: if isAdmin();
       }
     }

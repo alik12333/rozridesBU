@@ -5,10 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/booking_model.dart';
+import '../../models/post_inspection_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../utils/booking_status_utils.dart';
 import '../trip/active_trip_screen.dart';
+import '../trip/cash_settlement_screen.dart';
 import '../trip/post_trip_inspection_screen.dart';
 import '../trip/pre_trip_inspection_screen.dart';
 import '../reviews/submit_review_screen.dart';
@@ -408,72 +410,111 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     final List<Widget> buttons = [];
 
     if (isHost) {
+      // ── confirmed: show Start Handover OR waiting-for-renter state ─────
       if (booking.status == 'confirmed') {
-        final canStart = !DateTime.now().isBefore(
-            booking.startDate.subtract(const Duration(hours: 2)));
-        buttons.add(_actionBtn(
-          label: canStart
-              ? 'Start Handover'
-              : 'Available on ${_fmt(booking.startDate)}',
-          color: canStart ? const Color(0xFF16A34A) : Colors.grey.shade400,
-          onPressed: canStart
-              ? () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PreTripInspectionScreen(booking: booking),
-                    ),
-                  )
-              : null,
-        ));
+        if (booking.preHandoverCompleted) {
+          // Host done — waiting for renter to press Start Trip
+          buttons.add(_waitingBanner(
+            icon: Icons.hourglass_top_rounded,
+            title: 'Handover Complete',
+            message: 'Waiting for the renter to start the trip on their device.',
+          ));
+        } else {
+          final canStart = !DateTime.now().isBefore(
+              booking.startDate.subtract(const Duration(hours: 2)));
+          buttons.add(_actionBtn(
+            label: canStart ? 'Start Handover' : 'Available on ${_fmt(booking.startDate)}',
+            color: canStart ? const Color(0xFF16A34A) : Colors.grey.shade400,
+            onPressed: canStart
+                ? () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => PreTripInspectionScreen(booking: booking),
+                    ))
+                : null,
+          ));
+        }
       }
+
+      // ── active: view trip OR complete return OR waiting for renter ──────
       if (booking.status == 'active') {
         buttons.add(_actionBtn(
           label: '🚗 View Active Trip',
           color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ActiveTripScreen(bookingId: booking.id),
-            ),
-          ),
+          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(
+            builder: (_) => ActiveTripScreen(bookingId: booking.id),
+          )),
         ));
-        buttons.add(_actionBtn(
-          label: 'Complete Return',
-          color: Colors.blue.shade700,
-          onPressed: () => _navigateToReturn(context, booking),
-        ));
+        if (booking.postHandoverCompleted) {
+          // Host submitted return — waiting for renter
+          buttons.add(_waitingBanner(
+            icon: Icons.hourglass_top_rounded,
+            title: 'Return Submitted',
+            message: 'Waiting for the renter to review and confirm the settlement.',
+          ));
+        } else {
+          buttons.add(_actionBtn(
+            label: 'Complete Return',
+            color: Colors.blue.shade700,
+            onPressed: () => _navigateToReturn(context, booking),
+          ));
+        }
       }
-      // ── Host review button (completed trip) ─────────────────────────────
+
+      // ── completed: host review button ────────────────────────────────────
       if (booking.status == 'completed' &&
           booking.reviewStatus['hostSubmitted'] != true) {
         buttons.add(_actionBtn(
           label: 'Review Renter ⭐',
           color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SubmitReviewScreen(
-                booking: booking,
-                reviewType: 'host_to_renter',
-              ),
-            ),
-          ),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => SubmitReviewScreen(booking: booking, reviewType: 'host_to_renter'),
+          )),
         ));
       }
     } else {
+      // ────────────────────────── RENTER ACTIONS ───────────────────────────
+
+      // ── confirmed + preHandoverCompleted: show START TRIP ────────────────
+      if (booking.status == 'confirmed' && booking.preHandoverCompleted) {
+        buttons.add(_actionBtn(
+          label: '🚗 START TRIP',
+          color: const Color(0xFF16A34A),
+          onPressed: () => _renterStartTrip(context, booking),
+        ));
+      } else if (booking.status == 'confirmed') {
+        // Handover not done yet
+        buttons.add(_waitingBanner(
+          icon: Icons.access_time_rounded,
+          title: 'Awaiting Handover',
+          message: 'The host will initiate the handover process on their device.',
+        ));
+        buttons.add(_actionBtn(
+          label: 'Cancel Booking',
+          color: Colors.red.shade600,
+          outlined: true,
+          onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'renter'))),
+        ));
+      }
+
+      // ── active: view trip OR review & end trip ───────────────────────────
       if (booking.status == 'active') {
         buttons.add(_actionBtn(
           label: '🚗 View Active Trip',
           color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ActiveTripScreen(bookingId: booking.id),
-            ),
-          ),
+          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(
+            builder: (_) => ActiveTripScreen(bookingId: booking.id),
+          )),
         ));
+        if (booking.postHandoverCompleted) {
+          buttons.add(_actionBtn(
+            label: '🏁 REVIEW & END TRIP',
+            color: const Color(0xFF16A34A),
+            onPressed: () => _renterReviewReturn(context, booking),
+          ));
+        }
       }
+
+      // ── pending: cancel request ──────────────────────────────────────────
       if (booking.status == 'pending') {
         buttons.add(_actionBtn(
           label: 'Cancel Request',
@@ -483,30 +524,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'renter'))),
         ));
       }
-      if (booking.status == 'confirmed') {
-        buttons.add(_actionBtn(
-          label: 'Cancel Booking',
-          color: Colors.red.shade600,
-          outlined: true,
-          onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'renter'))),
-        ));
-      }
-      // ── Renter review button (completed trip) ──────────────────────────
+
+      // ── completed: renter review button ─────────────────────────────────
       if (booking.status == 'completed' &&
           booking.reviewStatus['renterSubmitted'] != true) {
         buttons.add(_actionBtn(
           label: 'Leave a Review ⭐',
           color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SubmitReviewScreen(
-                booking: booking,
-                reviewType: 'renter_to_host',
-              ),
-            ),
-          ),
+          onPressed: () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => SubmitReviewScreen(booking: booking, reviewType: 'renter_to_host'),
+          )),
         ));
       }
     }
@@ -523,6 +550,126 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         mainAxisSize: MainAxisSize.min,
         children: buttons.map((b) => Padding(padding: const EdgeInsets.only(bottom: 8), child: b)).toList(),
       ),
+    );
+  }
+
+  /// Renter presses START TRIP after host completes handover.
+  Future<void> _renterStartTrip(BuildContext ctx, BookingModel booking) async {
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('Start Your Trip?'),
+        content: const Text('By starting the trip you confirm that the car has been handed over to you and the deposit has been paid.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+            child: const Text('Start Trip'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !ctx.mounted) return;
+    try {
+      await _service.renterStartTrip(booking.id);
+      if (ctx.mounted) {
+        Navigator.pushReplacement(ctx, MaterialPageRoute(
+          builder: (_) => ActiveTripScreen(bookingId: booking.id),
+        ));
+        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+          content: Text('🚗 Trip started! Drive safe.'),
+          backgroundColor: Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  /// Renter presses REVIEW & END TRIP after host submits return.
+  Future<void> _renterReviewReturn(BuildContext ctx, BookingModel booking) async {
+    final snack = ScaffoldMessenger.of(ctx);
+    snack.showSnackBar(const SnackBar(
+      content: Text('Loading return inspection data…'),
+      duration: Duration(seconds: 2),
+    ));
+
+    // Load pre-trip inspection
+    final pre = await _service.fetchPreTripInspection(booking.id);
+    if (!ctx.mounted) return;
+    if (pre == null) {
+      snack.showSnackBar(const SnackBar(
+        content: Text('Could not load inspection data.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    // Load post-trip inspection from Firestore
+    PostTripInspection? postInspection;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(booking.id)
+          .collection('inspections')
+          .doc('post_trip')
+          .get();
+      if (doc.exists) {
+        postInspection = PostTripInspection.fromMap(doc.data()!);
+      }
+    } catch (_) {}
+
+    if (!ctx.mounted) return;
+    if (postInspection == null) {
+      snack.showSnackBar(const SnackBar(
+        content: Text('Return inspection data not ready yet.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    // Build a comparison result
+    final comparison = compareInspections(pre, postInspection);
+
+    Navigator.push(ctx, MaterialPageRoute(
+      builder: (_) => CashSettlementScreen(
+        booking: booking,
+        comparison: comparison,
+        postInspection: postInspection!,
+        hostMode: false,
+      ),
+    ));
+  }
+
+  Widget _waitingBanner({required IconData icon, required String title, required String message}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.purple.shade200),
+      ),
+      child: Row(children: [
+        Icon(icon, color: Colors.purple.shade400, size: 24),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(color: Colors.purple.shade800, fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 2),
+            Text(message, style: TextStyle(color: Colors.purple.shade700, fontSize: 12, height: 1.4)),
+          ],
+        )),
+      ]),
     );
   }
 

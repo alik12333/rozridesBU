@@ -108,7 +108,8 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
             builder: (_) => CashSettlementScreen(
                 booking: widget.booking,
                 comparison: result,
-                postInspection: finalPost)));
+                postInspection: finalPost,
+                hostMode: true)));
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

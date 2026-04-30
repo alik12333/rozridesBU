@@ -690,14 +690,16 @@ class BookingService {
   Stream<List<BookingModel>> getRenterBookings(String renterId) =>
       getBookingsForRenter(renterId);
 
-  // ──────────────────────── START TRIP ────────────────────────────────────
-
-  Future<void> startTrip(String bookingId, PreTripInspection inspection) async {
+  // ──────────────────── COMPLETE PRE-HANDOVER (Host) ──────────────────────
+  /// Host has finished the pre-trip inspection wizard.
+  /// Uploads photos, saves inspection doc, and sets preHandoverCompleted=true.
+  /// Status stays 'confirmed' — renter must press Start Trip separately.
+  Future<void> completePreHandover(String bookingId, PreTripInspection inspection) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) throw Exception('Not authenticated');
     final hostId = currentUser.uid;
 
-    // 1. Upload photos to Firebase Storage first
+    // 1. Upload photos
     final updatedItems = <String, InspectionItem>{};
     for (final entry in inspection.items.entries) {
       final area = entry.key;
@@ -706,20 +708,17 @@ class BookingService {
       for (int i = 0; i < item.photoUrls.length; i++) {
         final path = item.photoUrls[i];
         if (path.startsWith('http')) {
-          // Already a URL, keep it
           uploadedUrls.add(path);
           continue;
         }
         try {
           final file = File(path);
-          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final ts = DateTime.now().millisecondsSinceEpoch;
           final ref = FirebaseStorage.instance
-              .ref('inspections/$bookingId/pre_trip/${area}_$timestamp.jpg');
+              .ref('inspections/$bookingId/pre_trip/${area}_$ts.jpg');
           await ref.putFile(file);
-          final downloadUrl = await ref.getDownloadURL();
-          uploadedUrls.add(downloadUrl);
-        } catch (e) {
-          // Keep local path on upload failure — don't block the flow
+          uploadedUrls.add(await ref.getDownloadURL());
+        } catch (_) {
           uploadedUrls.add(path);
         }
       }
@@ -731,52 +730,48 @@ class BookingService {
       completedAt: DateTime.now(),
     );
 
-    // 2. Fetch booking for metadata
+    // 2. Fetch booking metadata
     final bookingSnap = await _firestore.collection('bookings').doc(bookingId).get();
     if (!bookingSnap.exists) throw Exception('Booking not found');
     final data = bookingSnap.data()!;
-    final carId     = data['carId'] as String? ?? '';
-    final renterId  = data['renterId'] as String? ?? '';
-    final carName   = data['carName']  as String? ?? '';
-    final endDate   = (data['endDate'] as Timestamp).toDate();
-    final deposit   = finalInspection.depositCollected;
+    final carId    = data['carId']    as String? ?? '';
+    final renterId = data['renterId'] as String? ?? '';
+    final carName  = data['carName']  as String? ?? '';
+    final deposit  = finalInspection.depositCollected;
 
     final batch = _firestore.batch();
     final bookingRef = _firestore.collection('bookings').doc(bookingId);
 
-    // 3. Update booking status
+    // 3. Mark handover done, but keep status as 'confirmed'
     batch.update(bookingRef, {
-      'status': 'active',
-      'tripStartedAt': FieldValue.serverTimestamp(),
+      'preHandoverCompleted': true,
       'cashPayments.depositPaidToHost': true,
       'cashPayments.depositPaidAmount': deposit,
       'cashPayments.depositPaidAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
-    // 4. Write inspection doc
+    // 4. Save inspection doc
     final inspectionRef = bookingRef.collection('inspections').doc('pre_trip');
     batch.set(inspectionRef, finalInspection.toMap());
 
     // 5. Timeline event
     _addTimelineEvent(
-      batch, bookingId, 'active',
-      'Car handed over. Security deposit of PKR ${deposit.toStringAsFixed(0)} '
-      'collected. Pre-trip inspection completed and signed by both parties.',
+      batch, bookingId, 'confirmed',
+      'Host completed handover. Security deposit PKR ${deposit.toStringAsFixed(0)} collected. '
+      'Waiting for renter to start the trip.',
       hostId,
     );
 
-    // 6. Renter notification
+    // 6. Notify renter
     if (renterId.isNotEmpty) {
       final notifRef = _firestore
-          .collection('users')
-          .doc(renterId)
-          .collection('notifications')
-          .doc();
+          .collection('users').doc(renterId)
+          .collection('notifications').doc();
       batch.set(notifRef, {
-        'type': 'trip_started',
-        'title': 'Trip Started 🚗',
-        'body': 'Your trip for $carName is now active. Return by ${_fmt(endDate)}.',
+        'type': 'handover_complete',
+        'title': 'Handover Complete! Tap to Start Your Trip 🚗',
+        'body': 'The host has completed the handover for $carName. Open RozRides to start your trip.',
         'bookingId': bookingId,
         'isRead': false,
         'isUnread': true,
@@ -786,26 +781,175 @@ class BookingService {
 
     await batch.commit();
 
-    // 7. Write conversation system message (outside batch — best-effort)
+    // 7. Chat system message (best-effort)
     try {
-      final now = DateTime.now();
       final convId = '${carId}_$renterId';
-      
+      await ChatService().postSystemMessage(
+        conversationId: convId,
+        text: '✅ Host has completed the handover for $carName. '
+            '${finalInspection.depositCollected.toStringAsFixed(0)} PKR deposit confirmed. '
+            'Renter: please open the app to start your trip!',
+      );
+    } catch (_) {}
+  }
+
+  // ──────────────────── RENTER STARTS TRIP ────────────────────────────────
+  /// Renter presses "Start Trip" after host completes handover.
+  /// Moves booking status from 'confirmed' to 'active'.
+  Future<void> renterStartTrip(String bookingId) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final renterId = currentUser.uid;
+
+    final bookingSnap = await _firestore.collection('bookings').doc(bookingId).get();
+    if (!bookingSnap.exists) throw Exception('Booking not found');
+    final data = bookingSnap.data()!;
+    final carId   = data['carId']   as String? ?? '';
+    final carName = data['carName'] as String? ?? '';
+    final hostId  = data['hostId']  as String? ?? '';
+    final endDate = (data['endDate'] as Timestamp).toDate();
+
+    // Guard: handover must be completed first
+    if (data['preHandoverCompleted'] != true) {
+      throw Exception('Handover not yet completed by host.');
+    }
+
+    final batch = _firestore.batch();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+
+    batch.update(bookingRef, {
+      'status': 'active',
+      'tripStartedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    _addTimelineEvent(
+      batch, bookingId, 'active',
+      'Renter started the trip. Return by ${_fmt(endDate)}.',
+      renterId,
+    );
+
+    // Notify host
+    if (hostId.isNotEmpty) {
+      final notifRef = _firestore
+          .collection('users').doc(hostId)
+          .collection('notifications').doc();
+      batch.set(notifRef, {
+        'type': 'trip_started',
+        'title': 'Trip Started 🚗',
+        'body': 'The renter has started the trip for $carName.',
+        'bookingId': bookingId,
+        'isRead': false,
+        'isUnread': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+
+    // Chat message (best-effort)
+    try {
+      final convId = '${carId}_$renterId';
       await ChatService().updateConversationBookingStatus(
         conversationId: convId,
         bookingStatus: 'active',
       );
       await ChatService().postSystemMessage(
         conversationId: convId,
-        text: '🚗 Trip started on ${_fmt(now)}. '
-            'Security deposit of PKR ${deposit.toStringAsFixed(0)} confirmed received. '
-            'Safe travels!',
+        text: '🚗 Trip started! Return by ${_fmt(endDate)}. Safe travels!',
       );
     } catch (_) {}
   }
 
-  // ──────────────────────── COMPLETE TRIP ─────────────────────────────────
 
+  // ──────────────────── PROPOSE SETTLEMENT (Host) ─────────────────────────
+  /// Host has completed post-trip inspection and proposed a settlement.
+  /// Uploads photos, saves inspection + proposed settlement, sets postHandoverCompleted=true.
+  /// Status stays 'active' — renter must confirm to end the trip.
+  Future<void> proposeSettlement({
+    required String bookingId,
+    required String carId,
+    required PostTripInspection postInspection,
+    required CashSettlement settlement,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) throw Exception('Not authenticated');
+    final hostId = currentUser.uid;
+
+    // 1. Upload photos
+    final updatedItems = <String, InspectionItem>{};
+    for (final entry in postInspection.items.entries) {
+      final area = entry.key;
+      final item = entry.value;
+      final uploadedUrls = <String>[];
+      for (final path in item.photoUrls) {
+        if (path.startsWith('http')) { uploadedUrls.add(path); continue; }
+        try {
+          final file = File(path);
+          final ts = DateTime.now().millisecondsSinceEpoch;
+          final ref = FirebaseStorage.instance
+              .ref('inspections/$bookingId/post_trip/${area}_$ts.jpg');
+          await ref.putFile(file);
+          uploadedUrls.add(await ref.getDownloadURL());
+        } catch (_) { uploadedUrls.add(path); }
+      }
+      updatedItems[area] = item.copyWith(photoUrls: uploadedUrls);
+    }
+    final finalPost = postInspection.copyWith(items: updatedItems, completedAt: DateTime.now());
+
+    // 2. Fetch booking metadata
+    final bookingSnap = await _firestore.collection('bookings').doc(bookingId).get();
+    if (!bookingSnap.exists) throw Exception('Booking not found');
+    final data = bookingSnap.data()!;
+    final renterId = data['renterId'] as String? ?? '';
+    final carName  = data['carName']  as String? ?? '';
+
+    final batch = _firestore.batch();
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+
+    // 3. Write post-trip inspection doc
+    final postRef = bookingRef.collection('inspections').doc('post_trip');
+    batch.set(postRef, finalPost.toMap());
+
+    // 4. Store proposed settlement and mark postHandoverCompleted
+    batch.update(bookingRef, {
+      'postHandoverCompleted': true,
+      'proposedSettlement': {
+        'rentAmount': settlement.rentPaid,
+        'depositRefund': settlement.depositRefunded,
+        'damageDeduction': settlement.damageDeduction,
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // 5. Timeline event
+    _addTimelineEvent(
+      batch, bookingId, 'active',
+      'Host submitted return inspection. Damage deduction: PKR ${settlement.damageDeduction.toStringAsFixed(0)}. '
+      'Waiting for renter to confirm and end trip.',
+      hostId,
+    );
+
+    // 6. Notify renter
+    if (renterId.isNotEmpty) {
+      final notifRef = _firestore
+          .collection('users').doc(renterId)
+          .collection('notifications').doc();
+      batch.set(notifRef, {
+        'type': 'return_proposed',
+        'title': 'Host Submitted Return — Tap to End Trip 🏁',
+        'body': 'The host has submitted the return for $carName. Open RozRides to review and confirm.',
+        'bookingId': bookingId,
+        'isRead': false,
+        'isUnread': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+  }
+
+  // ──────────────────────── COMPLETE TRIP (Renter confirms) ───────────────
   Future<void> completeTrip({
     required String bookingId,
     required String carId,

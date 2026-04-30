@@ -43,6 +43,14 @@ class BookingModel {
   final DateTime? tripStartedAt;
   final DateTime? tripEndedAt;
 
+  // Two-stage handover flags
+  /// True when host has completed pre-trip inspection; renter must now press "Start Trip".
+  final bool preHandoverCompleted;
+  /// True when host has submitted the post-trip return; renter must now confirm settlement.
+  final bool postHandoverCompleted;
+  /// The settlement proposed by the host at return (damageDeduction, depositRefund, rentAmount).
+  final Map<String, dynamic>? proposedSettlement;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -73,6 +81,9 @@ class BookingModel {
     required this.reviewStatus,
     this.tripStartedAt,
     this.tripEndedAt,
+    this.preHandoverCompleted = false,
+    this.postHandoverCompleted = false,
+    this.proposedSettlement,
     required this.createdAt,
     required this.updatedAt,
     required this.expiresAt,
@@ -137,6 +148,11 @@ class BookingModel {
             map['reviewStatus'] as Map? ?? defaultReviewStatus),
         tripStartedAt: (map['tripStartedAt'] is Timestamp) ? (map['tripStartedAt'] as Timestamp).toDate() : null,
         tripEndedAt: (map['tripEndedAt'] is Timestamp) ? (map['tripEndedAt'] as Timestamp).toDate() : null,
+        preHandoverCompleted: map['preHandoverCompleted'] as bool? ?? false,
+        postHandoverCompleted: map['postHandoverCompleted'] as bool? ?? false,
+        proposedSettlement: map['proposedSettlement'] != null
+            ? Map<String, dynamic>.from(map['proposedSettlement'] as Map)
+            : null,
         createdAt: createdAt,
         updatedAt: (map['updatedAt'] is Timestamp)
             ? (map['updatedAt'] as Timestamp).toDate()
@@ -180,6 +196,9 @@ class BookingModel {
           tripStartedAt != null ? Timestamp.fromDate(tripStartedAt!) : null,
       'tripEndedAt':
           tripEndedAt != null ? Timestamp.fromDate(tripEndedAt!) : null,
+      'preHandoverCompleted': preHandoverCompleted,
+      'postHandoverCompleted': postHandoverCompleted,
+      'proposedSettlement': proposedSettlement,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expiresAt),
@@ -196,6 +215,9 @@ class BookingModel {
     DateTime? tripEndedAt,
     Map<String, dynamic>? cashPayments,
     Map<String, dynamic>? reviewStatus,
+    bool? preHandoverCompleted,
+    bool? postHandoverCompleted,
+    Map<String, dynamic>? proposedSettlement,
   }) {
     return BookingModel(
       id: id,
@@ -221,6 +243,9 @@ class BookingModel {
       reviewStatus: reviewStatus ?? this.reviewStatus,
       tripStartedAt: tripStartedAt ?? this.tripStartedAt,
       tripEndedAt: tripEndedAt ?? this.tripEndedAt,
+      preHandoverCompleted: preHandoverCompleted ?? this.preHandoverCompleted,
+      postHandoverCompleted: postHandoverCompleted ?? this.postHandoverCompleted,
+      proposedSettlement: proposedSettlement ?? this.proposedSettlement,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       expiresAt: expiresAt,

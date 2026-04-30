@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,12 +11,16 @@ class CashSettlementScreen extends StatefulWidget {
   final BookingModel booking;
   final ComparisonResult comparison;
   final PostTripInspection postInspection;
+  /// True when opened by the host to propose a settlement.
+  /// False when opened by the renter to review and confirm.
+  final bool hostMode;
 
   const CashSettlementScreen({
     super.key,
     required this.booking,
     required this.comparison,
     required this.postInspection,
+    this.hostMode = false,
   });
 
   @override
@@ -49,19 +52,40 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
         depositRefunded: _depositRefund,
         damageDeduction: _deduction,
       );
-      await _service.completeTrip(
-        bookingId: widget.booking.id,
-        carId: widget.booking.carId,
-        postInspection: widget.postInspection,
-        settlement: settlement,
-      );
-      if (mounted) {
-        Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == '/');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Trip completed! Thanks for using RozRides.'),
-          backgroundColor: Color(0xFF16A34A),
-          behavior: SnackBarBehavior.floating,
-        ));
+
+      if (widget.hostMode) {
+        // Host is proposing: upload inspection and store settlement, wait for renter
+        await _service.proposeSettlement(
+          bookingId: widget.booking.id,
+          carId: widget.booking.carId,
+          postInspection: widget.postInspection,
+          settlement: settlement,
+        );
+        if (mounted) {
+          Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == '/');
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Return submitted! Waiting for renter to confirm.'),
+            backgroundColor: Color(0xFF7C3AED),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
+          ));
+        }
+      } else {
+        // Renter is confirming: actually complete the trip
+        await _service.completeTrip(
+          bookingId: widget.booking.id,
+          carId: widget.booking.carId,
+          postInspection: widget.postInspection,
+          settlement: settlement,
+        );
+        if (mounted) {
+          Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == '/');
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ Trip completed! Thanks for using RozRides.'),
+            backgroundColor: Color(0xFF16A34A),
+            behavior: SnackBarBehavior.floating,
+          ));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -455,26 +479,48 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
   }
 
   Widget _closeTripButton(bool enabled) {
-    final isHost = FirebaseAuth.instance.currentUser?.uid == widget.booking.hostId;
-
-    if (!isHost) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300),
+    // HOST MODE: show "Send to Renter" or waiting-for-renter indicator
+    if (widget.hostMode) {
+      return Column(children: [
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: (enabled && !_submitting) ? _closeTrip : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: _submitting
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : const Text('SEND TO RENTER FOR CONFIRMATION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          ),
         ),
-        child: Column(children: [
-          Icon(Icons.hourglass_empty, color: Colors.grey.shade500),
-          const SizedBox(height: 8),
-          Text('Waiting for Host to close the trip...',
-              style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
-        ]),
-      );
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.purple.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.purple.shade200),
+          ),
+          child: Row(children: [
+            Icon(Icons.info_outline, color: Colors.purple.shade600, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'The renter will review this settlement on their device and confirm to end the trip.',
+                style: TextStyle(color: Colors.purple.shade800, fontSize: 12, height: 1.4),
+              ),
+            ),
+          ]),
+        ),
+      ]);
     }
 
+    // RENTER MODE: confirm and end trip
     return SizedBox(
       width: double.infinity,
       height: 54,
@@ -484,17 +530,11 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
           backgroundColor: const Color(0xFF16A34A),
           foregroundColor: Colors.white,
           disabledBackgroundColor: Colors.grey.shade300,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: _submitting
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Colors.white))
-            : const Text('CLOSE TRIP',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+            : const Text('CONFIRM & END TRIP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
     );
   }
