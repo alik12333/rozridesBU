@@ -15,7 +15,12 @@ export async function POST(req: NextRequest) {
 
         // Check if the caller is an admin in Firestore
         const callerDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
-        if (!callerDoc.exists || !callerDoc.data()?.roles?.isAdmin) {
+        const data = callerDoc.data();
+        
+        const isLegacyAdmin = data?.role === 'admin' || data?.role === 'super_admin';
+        const isNewAdmin = data?.roles?.isAdmin === true;
+
+        if (!callerDoc.exists || (!isLegacyAdmin && !isNewAdmin)) {
             return NextResponse.json({ error: 'Forbidden: You must be an admin to perform this action' }, { status: 403 });
         }
 
