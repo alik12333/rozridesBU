@@ -35,6 +35,8 @@ class RozRidesApp extends StatelessWidget {
         title: 'RozRides',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        // The splash plays once. Its nextScreen is the AuthWrapper which
+        // routes to Home or Login based on persisted Firebase auth state.
         home: const SplashScreen(nextScreen: AuthWrapper()),
       ),
     );
@@ -48,19 +50,24 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    // While loading
+    // While Firebase is restoring the persisted session
     if (authProvider.status == AuthStatus.loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: Color(0xFF0D0B1E),
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+          ),
+        ),
       );
     }
 
-    // If user exists
+    // Already logged in (Firebase persisted the session) → go straight to Home
     if (authProvider.currentUser != null) {
       return const HomeScreen();
     }
 
-    // Default: show login
+    // Not logged in → show Login
     return const LoginScreen();
   }
 }
