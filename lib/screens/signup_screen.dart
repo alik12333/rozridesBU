@@ -36,6 +36,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSigningUp = false;
+  bool? _hasDrivingLicense;
 
   @override
   void dispose() {
@@ -342,9 +343,79 @@ class _SignupScreenState extends State<SignupScreen> {
                         _cnicUploadField('CNIC Back', 'cnic_back', _cnicBack),
                         const SizedBox(height: 32),
 
+                        // Driving License Toggle
+                        Text(
+                          'Do you have a valid driving licence?',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _hasDrivingLicense = true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _hasDrivingLicense == true ? Colors.green : Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _hasDrivingLicense == true ? Colors.green : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'Yes',
+                                    style: TextStyle(
+                                      color: _hasDrivingLicense == true ? Colors.white : Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _hasDrivingLicense = false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _hasDrivingLicense == false ? Colors.red : Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _hasDrivingLicense == false ? Colors.red : Colors.grey.shade400,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    'No',
+                                    style: TextStyle(
+                                      color: _hasDrivingLicense == false ? Colors.white : Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_hasDrivingLicense == false)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'A driving licence is important to make a account',
+                              style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        const SizedBox(height: 32),
+
                         CustomButton(
                           text: 'Sign Up',
-                          onPressed: _signUp,
+                          onPressed: _hasDrivingLicense == true ? () => _signUp() : () {},
+                          isDisabled: _hasDrivingLicense != true,
                           isLoading: _isSigningUp,
                           icon: Icons.person_add,
                         ),

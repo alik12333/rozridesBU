@@ -16,9 +16,14 @@ import 'add_listing_screen.dart';
 import 'chat/conversations_list_screen.dart';
 import '../providers/chat_provider.dart';
 
+// ── Brand colours (mirrors AppTheme) ─────────────────────────────────────────
+const _kPrimary   = Color(0xFF6200EE);
+const _kPrimaryDk = Color(0xFF3700B3);
+const _kAccent    = Color(0xFF03DAC6);
+const _kBg        = Color(0xFFF3E5F5);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -31,13 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ListingProvider>().loadAllListings();
-      
       final user = context.read<AuthProvider>().currentUser;
       if (user != null) {
-        final bookingProvider = context.read<BookingProvider>();
-        bookingProvider.listenToHostBookings(user.id);
-        bookingProvider.listenToRenterBookings(user.id);
-        // Start listening to conversations for unread badge + inbox
+        context.read<BookingProvider>()
+          ..listenToHostBookings(user.id)
+          ..listenToRenterBookings(user.id);
         context.read<ChatProvider>().listenToConversations(user.id);
       }
     });
@@ -49,177 +52,565 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      // ── Drawer ────────────────────────────────────────────────────────────
+      backgroundColor: _kBg,
       drawer: _AppDrawer(user: user),
-      // ── AppBar ───────────────────────────────────────────────────────────
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            // Hamburger icon
-            IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              tooltip: 'Menu',
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            ),
-            Text(
-              'RozRides',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'Search on map',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MapSearchScreen()),
-            ),
-          ),
-        ],
-      ),
-      // ── Body ─────────────────────────────────────────────────────────────
       body: RefreshIndicator(
-        onRefresh: () async {
-          await context.read<ListingProvider>().loadAllListings();
-        },
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).primaryColor,
-                      Theme.of(context).primaryColor.withValues(alpha: 0.7),
-                    ],
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back,',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user?.fullName ?? 'Guest',
-                      style: GoogleFonts.outfit(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Find your perfect ride',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
+        color: _kPrimary,
+        onRefresh: () => context.read<ListingProvider>().loadAllListings(),
+        child: CustomScrollView(
+          slivers: [
+            // ── Hero SliverAppBar ─────────────────────────────────────────
+            SliverAppBar(
+              expandedHeight: 220,
+              pinned: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: _kPrimaryDk,
+              flexibleSpace: FlexibleSpaceBar(
+                background: _HeroBanner(
+                  user: user,
+                  onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  onSearchTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const MapSearchScreen())),
                 ),
               ),
+              // collapsed app-bar row
+              title: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu_rounded, color: Colors.white),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  ),
+                  Text('RozRides',
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold, color: Colors.white)),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded, color: Colors.white),
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const MapSearchScreen())),
+                ),
+              ],
+            ),
 
-              const SizedBox(height: 24),
+            // ── Quick Actions ─────────────────────────────────────────────
+            SliverToBoxAdapter(child: _QuickActions()),
 
-              // Available Cars
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            // ── Section header ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Available Cars',
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MapSearchScreen()),
-                      ),
-                      child: const Text('View All'),
+                    Text('Available Cars',
+                        style: GoogleFonts.outfit(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(context,
+                          MaterialPageRoute(
+                              builder: (_) => const MapSearchScreen())),
+                      icon: const Icon(Icons.map_outlined, size: 16),
+                      label: const Text('Map View'),
                     ),
                   ],
                 ),
               ),
+            ),
 
-              const SizedBox(height: 12),
-
-              Consumer<ListingProvider>(
-                builder: (context, provider, _) {
-                  if (provider.status == ListingStatus.loading) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  }
-                  if (provider.allListings.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            Icon(Icons.directions_car_outlined,
-                                size: 60, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
-                            const Text('No cars available yet',
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 8),
-                            Text('Be the first to list your car!',
-                                style: TextStyle(
-                                    fontSize: 14, color: Colors.grey.shade600)),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: provider.allListings.length,
-                    itemBuilder: (_, i) =>
-                        _CarCard(listing: provider.allListings[i]),
+            // ── Car list ─────────────────────────────────────────────────
+            Consumer<ListingProvider>(
+              builder: (context, provider, _) {
+                if (provider.status == ListingStatus.loading) {
+                  return const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
                   );
-                },
-              ),
-
-              const SizedBox(height: 24),
-            ],
-          ),
+                }
+                if (provider.allListings.isEmpty) {
+                  return SliverFillRemaining(child: _EmptyState());
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => _CarCard(listing: provider.allListings[i]),
+                      childCount: provider.allListings.length,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Drawer ─────────────────────────────────────────────────────────────────
+// ── Hero Banner ───────────────────────────────────────────────────────────────
+class _HeroBanner extends StatelessWidget {
+  final dynamic user;
+  final VoidCallback onMenuTap;
+  final VoidCallback onSearchTap;
 
+  const _HeroBanner(
+      {required this.user,
+      required this.onMenuTap,
+      required this.onSearchTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final firstName = (user?.fullName as String? ?? 'there').split(' ').first;
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_kPrimaryDk, _kPrimary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // decorative circle
+          Positioned(
+            right: -40,
+            top: -40,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 30,
+            bottom: -20,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.04),
+              ),
+            ),
+          ),
+          // content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.wb_sunny_rounded,
+                          color: Color(0xFFFFD54F), size: 18),
+                      const SizedBox(width: 6),
+                      Text('Good day, $firstName!',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 14)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Find Your Perfect Ride',
+                      style: GoogleFonts.outfit(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                  const SizedBox(height: 16),
+                  // Search pill
+                  GestureDetector(
+                    onTap: onSearchTap,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.search_rounded,
+                              color: Colors.white70, size: 20),
+                          const SizedBox(width: 10),
+                          Text('Search by location or city…',
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontSize: 14)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: _kAccent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(Icons.tune_rounded,
+                                color: Colors.black, size: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Quick Actions ─────────────────────────────────────────────────────────────
+class _QuickActions extends StatelessWidget {
+  final List<_QA> _actions = const [
+    _QA(Icons.book_outlined, 'My\nBookings', MyBookingsScreen()),
+    _QA(Icons.inbox_rounded, 'Host\nInbox', HostBookingsScreen()),
+    _QA(Icons.directions_car_outlined, 'My\nListings', MyListingsScreen()),
+    _QA(Icons.add_circle_outline_rounded, 'Add\nListing', AddListingScreen()),
+  ];
+
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: _actions.map((a) => _QAButton(qa: a)).toList(),
+      ),
+    );
+  }
+}
+
+class _QA {
+  final IconData icon;
+  final String label;
+  final Widget screen;
+  const _QA(this.icon, this.label, this.screen);
+}
+
+class _QAButton extends StatelessWidget {
+  final _QA qa;
+  const _QAButton({required this.qa});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => qa.screen)),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: _kPrimary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(qa.icon, color: _kPrimary, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(qa.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: _kPrimary.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.directions_car_outlined,
+                size: 60, color: _kPrimary.withValues(alpha: 0.5)),
+          ),
+          const SizedBox(height: 20),
+          Text('No Cars Available Yet',
+              style: GoogleFonts.outfit(
+                  fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('Be the first to list your car!',
+              style:
+                  TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Car Card ──────────────────────────────────────────────────────────────────
+class _CarCard extends StatelessWidget {
+  final ListingModel listing;
+  const _CarCard({required this.listing});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => CarDetailScreen(listing: listing))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: _kPrimary.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image ────────────────────────────────────────────────────
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: listing.images.isNotEmpty
+                      ? Image.network(
+                          listing.images.first,
+                          height: 190,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _imgPlaceholder(),
+                        )
+                      : _imgPlaceholder(),
+                ),
+                // price badge
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'PKR ${listing.pricePerDay.toStringAsFixed(0)}/day',
+                      style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
+                    ),
+                  ),
+                ),
+                // driver badge
+                if (listing.withDriver)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _kAccent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text('With Driver',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black)),
+                    ),
+                  ),
+              ],
+            ),
+
+            // ── Details ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // name + rating
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${listing.carName} ${listing.model}',
+                          style: GoogleFonts.outfit(
+                              fontSize: 17, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (listing.totalReviews > 0) ...[
+                        const Icon(Icons.star_rounded,
+                            color: Color(0xFFFFB300), size: 16),
+                        const SizedBox(width: 3),
+                        Text(
+                          listing.averageRating.toStringAsFixed(1),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        const SizedBox(width: 3),
+                        Text('(${listing.totalReviews})',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade500)),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  // location
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined,
+                          size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 3),
+                      Text(
+                        [listing.area, listing.city]
+                            .where((e) => e != null && e.isNotEmpty)
+                            .join(', ')
+                            .let((s) => s.isNotEmpty ? s : 'Location not set'),
+                        style: TextStyle(
+                            fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // chips row
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _chip(Icons.speed_rounded,
+                          '${listing.year}', Colors.indigo),
+                      _chip(Icons.local_gas_station_outlined,
+                          listing.fuelType, Colors.orange),
+                      _chip(Icons.settings_outlined,
+                          listing.transmission, Colors.teal),
+                      if (listing.hasInsurance)
+                        _chip(Icons.shield_outlined,
+                            'Insured', Colors.green),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+
+                  // owner row
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor:
+                            _kPrimary.withValues(alpha: 0.15),
+                        child: Text(
+                          listing.ownerName.isNotEmpty
+                              ? listing.ownerName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              color: _kPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(listing.ownerName,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w500)),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                              colors: [_kPrimary, _kPrimaryDk]),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text('View Car',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _imgPlaceholder() => Container(
+        height: 190,
+        color: _kPrimary.withValues(alpha: 0.08),
+        child: const Center(
+          child: Icon(Icons.directions_car_outlined,
+              size: 60, color: Color(0xFFBBBBBB)),
+        ),
+      );
+
+  Widget _chip(IconData icon, String label, Color color) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w700)),
+          ],
+        ),
+      );
+}
+
+// ── Drawer ────────────────────────────────────────────────────────────────────
 class _AppDrawer extends StatelessWidget {
-  final dynamic user; // UserModel
-
+  final dynamic user;
   const _AppDrawer({required this.user});
 
   void _go(BuildContext context, Widget screen) {
-    Navigator.pop(context); // close drawer first
+    Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
@@ -227,24 +618,22 @@ class _AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Drawer(
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.horizontal(right: Radius.circular(24)),
-      ),
+          borderRadius:
+              BorderRadius.horizontal(right: Radius.circular(24))),
       child: Column(
         children: [
-          // ── User Header ────────────────────────────────────────────────
+          // header
           Container(
             width: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).primaryColor.withValues(alpha: 0.75),
-                ],
+                colors: [_kPrimaryDk, _kPrimary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
             ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 20, 20, 20),
+            padding: EdgeInsets.fromLTRB(
+                20, MediaQuery.of(context).padding.top + 20, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -257,48 +646,39 @@ class _AppDrawer extends StatelessWidget {
                       : null,
                   child: (user?.profilePhoto == null ||
                           (user!.profilePhoto as String).isEmpty)
-                      ? const Icon(Icons.person, color: Colors.white, size: 32)
+                      ? const Icon(Icons.person,
+                          color: Colors.white, size: 32)
                       : null,
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  user?.fullName ?? 'Guest',
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text(user?.fullName ?? 'Guest',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
-                Text(
-                  user?.email ?? '',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(user?.email ?? '',
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12),
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
 
-          // ── Scrollable tile list ───────────────────────────────────────
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-              // ── ACCOUNT ──────────────────────────────────────────────
                 _sectionLabel('Account'),
                 Consumer<ChatProvider>(
-                  builder: (context, chat, _) {
-                    final unread = chat.totalUnreadCount;
-                    return _DrawerTile(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      label: 'Messages',
-                      badgeCount: unread,
-                      onTap: () => _go(context, const ConversationsListScreen()),
-                    );
-                  },
+                  builder: (context, chat, _) => _DrawerTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: 'Messages',
+                    badgeCount: chat.totalUnreadCount,
+                    onTap: () =>
+                        _go(context, const ConversationsListScreen()),
+                  ),
                 ),
                 _DrawerTile(
                   icon: Icons.person_outline,
@@ -306,8 +686,6 @@ class _AppDrawer extends StatelessWidget {
                   onTap: () => _go(context, const ProfileScreen()),
                 ),
                 const Divider(indent: 16, endIndent: 16, height: 24),
-
-                // ── AS RENTER ────────────────────────────────────────────
                 _sectionLabel('As Renter'),
                 _DrawerTile(
                   icon: Icons.book_outlined,
@@ -324,10 +702,7 @@ class _AppDrawer extends StatelessWidget {
                   label: 'Search on Map',
                   onTap: () => _go(context, const MapSearchScreen()),
                 ),
-
                 const Divider(indent: 16, endIndent: 16, height: 24),
-
-                // ── AS HOST ──────────────────────────────────────────────
                 _sectionLabel('As Host'),
                 _DrawerTile(
                   icon: Icons.inbox_rounded,
@@ -348,15 +723,17 @@ class _AppDrawer extends StatelessWidget {
             ),
           ),
 
-          // ── Footer ────────────────────────────────────────────────────
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: ListTile(
-              leading: const Icon(Icons.logout_rounded, color: Colors.red),
+              leading:
+                  const Icon(Icons.logout_rounded, color: Colors.red),
               title: Text('Sign Out',
                   style: TextStyle(
-                      color: Colors.red.shade700, fontWeight: FontWeight.w600)),
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(context);
                 context.read<AuthProvider>().signOut();
@@ -374,11 +751,10 @@ class _AppDrawer extends StatelessWidget {
         child: Text(
           label.toUpperCase(),
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey.shade500,
-            letterSpacing: 1.0,
-          ),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade500,
+              letterSpacing: 1.0),
         ),
       );
 }
@@ -399,187 +775,35 @@ class _DrawerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: Theme.of(context).primaryColor, size: 22),
+      leading: Icon(icon, color: _kPrimary, size: 22),
       title: Text(label,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          style:
+              const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
       trailing: badgeCount > 0
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF7C3AED),
+                color: _kPrimary,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                '$badgeCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: Text('$badgeCount',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
             )
           : null,
       onTap: onTap,
       horizontalTitleGap: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
     );
   }
 }
 
-
-
-class _CarCard extends StatelessWidget {
-  final ListingModel listing;
-
-  const _CarCard({required this.listing});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CarDetailScreen(listing: listing),
-          ),
-        );
-      },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
-            if (listing.images.isNotEmpty)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Image.network(
-                  listing.images.first,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    '${listing.carName} ${listing.model}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Year and Engine
-                  Text(
-                    '${listing.year} • ${listing.engineSize}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Price
-                  Row(
-                    children: [
-                      const Icon(Icons.payments, size: 20, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(
-                        'PKR ${listing.pricePerDay.toStringAsFixed(0)}/day',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Features
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _FeatureChip(
-                        icon: listing.withDriver ? Icons.person : Icons.person_off,
-                        label: listing.withDriver ? 'With Driver' : 'Self Drive',
-                      ),
-                      _FeatureChip(
-                        icon: listing.hasInsurance ? Icons.shield : Icons.warning,
-                        label: listing.hasInsurance ? 'Insured' : 'No Insurance',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Owner info
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 16,
-                        child: Icon(Icons.person, size: 18),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        listing.ownerName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FeatureChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _FeatureChip({
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Theme.of(context).primaryColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).primaryColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+// ── tiny extension helper ─────────────────────────────────────────────────────
+extension _Let<T> on T {
+  R let<R>(R Function(T) block) => block(this);
 }

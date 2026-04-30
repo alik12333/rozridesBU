@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../renter/my_bookings_screen.dart';
 
 class BookingConfirmedScreen extends StatelessWidget {
   final String bookingId;
@@ -128,9 +129,13 @@ class BookingConfirmedScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     // Navigate to MyBookingsScreen
-                    Navigator.of(context)
-                        .popUntil((route) => route.isFirst);
-                    // TODO: switch tab to "My Bookings" when tab navigation is added
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MyBookingsScreen(),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF7C3AED),
