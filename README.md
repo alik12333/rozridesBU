@@ -2,122 +2,134 @@
 
 **RozRides** is a comprehensive, peer-to-peer car rental platform tailored for Pakistan. It seamlessly connects car owners (hosts) with individuals looking to rent vehicles, providing a robust ecosystem for browsing, booking, messaging, and managing rentals.
 
+---
+
 ## 🌟 Key Features
 
 ### For Renters
-* **Map-Based Search & Discovery:** Find available cars nearby using interactive maps (powered by Google Maps & Geolocator).
-* **Detailed Listings:** View car details, high-quality images, pricing breakdowns, and host reviews.
-* **Seamless Booking:** Easy booking flow with real-time availability and transparent pricing (including cash settlements).
-* **Trip Management:** Comprehensive trip lifecycle management including Pre-Trip and Post-Trip inspections, damage claims, and cancellations.
-* **In-App Messaging:** Communicate directly with hosts securely within the app.
-* **Reviews & Ratings:** Leave feedback after completing trips to build community trust.
+*   **Map-Based Search & Discovery**: Find available cars nearby using interactive maps (powered by Google Maps & Geolocator).
+*   **Detailed Listings**: View car details, high-quality images, pricing breakdowns, and host reviews.
+*   **Seamless Booking**: Easy booking flow with real-time availability and transparent pricing (including cash settlements).
+*   **Trip Management**: Comprehensive trip lifecycle management including:
+    *   **Pre-Trip & Post-Trip Inspections**: Mandatory photo inspections to ensure vehicle safety.
+    *   **Active Trip Tracking**: Real-time status updates during the rental period.
+    *   **Damage Claims**: Integrated system for reporting and managing vehicle damage.
+*   **In-App Messaging**: Communicate directly with hosts securely within the app via real-time chat.
+*   **Reviews & Ratings**: Build community trust with a robust rating system.
 
 ### For Hosts (Car Owners)
-* **Easy Listing Management:** Add new vehicles, set locations, and manage availability.
-* **Booking Dashboard:** Review incoming requests, accept/decline bookings, and track upcoming reservations.
-* **Asset Protection:** Mandatory pre-trip and post-trip photo inspections, along with integrated damage claims and flag systems.
-* **Earnings Management:** Track bookings and cash settlements easily.
+*   **Easy Listing Management**: Add new vehicles with detailed specs, set locations using a map picker, and manage availability.
+*   **Booking Dashboard**: Review incoming requests, accept/decline bookings, and track upcoming reservations.
+*   **Asset Protection**: Mandatory inspection flows and automated damage claim flagging.
+*   **Earnings & Performance**: Track completed bookings and manage cash settlements efficiently.
 
 ### Admin Panel (Web)
-* **User & Listing Management:** Full overview of users, CNIC verifications, and vehicle listings.
-* **Dispute Resolution:** Handle flagged trips, damage claims, and booking cancellations.
-* **Platform Health:** Tools to monitor activity, approve/reject user roles, and ban misbehaving accounts.
+*   **User & Listing Management**: Full overview of users, CNIC verifications, and vehicle listings.
+*   **Dispute Resolution**: Handle flagged trips, damage claims, and booking cancellations.
+*   **Platform Health**: Tools to monitor activity, approve/reject user roles, and ban misbehaving accounts.
+
+---
 
 ## 🛠 Tech Stack
 
-**Mobile Application:**
-* **Framework:** [Flutter](https://flutter.dev/) (Dart)
-* **State Management:** Provider
-* **Backend as a Service (BaaS):** Firebase (Auth, Cloud Firestore, Cloud Storage)
-* **Mapping & Location:** Google Maps Flutter, Geolocator, Geoflutterfire Plus
-* **Design:** Custom AppTheme with Google Fonts
+### Mobile Application (Flutter)
+*   **Framework**: [Flutter](https://flutter.dev/) (Dart)
+*   **State Management**: `Provider` for reactive UI updates.
+*   **Backend**: Firebase (Auth, Cloud Firestore, Cloud Storage).
+*   **Mapping**: `google_maps_flutter`, `geolocator`, `geoflutterfire_plus`.
+*   **Utilities**: `intl`, `cached_network_image`, `url_launcher`, `google_fonts`.
 
-**Admin Web Portal:**
-* **Framework:** Next.js (TypeScript/React)
-* **Backend Integration:** Firebase Admin SDK (via serverless API routes)
+### Admin Portal (Next.js)
+*   **Framework**: [Next.js](https://nextjs.org/) (TypeScript/React).
+*   **Backend Integration**: Firebase Admin SDK (serverless API routes).
+*   **Styling**: Modern, responsive dashboard layouts.
+
+---
 
 ## 🗺 System Architecture (Graphify Insights)
-Based on our project graph analysis:
-* **Core Abstractions:** The app relies heavily on a solid foundation of Providers (`AuthProvider`, `BookingProvider`, `ChatProvider`) and Services (`AuthService`, `BookingService`, `ListingService`) connecting directly to `Cloud Firestore`.
-* **Booking Lifecycle:** The `BookingModel` is the central hub, intersecting with `PreTripInspection`, `PostTripInspection`, `DamageClaim`, and `Review` flows.
-* **Modular Communities:** Features are well-segmented into functional communities such as *Search/Location*, *Chat/Messaging*, *Host Dashboard*, and *Admin Utilities*.
+
+Our project architecture is analyzed and visualized using **Graphify**. The system is composed of **908 nodes** and **1103 edges**, organized into functional communities.
+
+### Booking Lifecycle Flow
+```mermaid
+graph TD
+    A[Search / Map Discovery] --> B[Car Detail / Listing]
+    B --> C[Booking Request]
+    C --> D{Host Approval}
+    D -- Rejected --> E[Cancellation]
+    D -- Approved --> F[Booking Confirmed]
+    F --> G[Pre-Trip Inspection]
+    G --> H[Active Trip]
+    H --> I[Post-Trip Inspection]
+    I --> J[Cash Settlement / Review]
+    J --> K[Trip Completed]
+```
+
+### Core Abstractions
+*   **Providers**: `AuthProvider`, `BookingProvider`, `ChatProvider`, `ListingProvider` - These act as the glue between the UI and services.
+*   **Services**: `AuthService`, `BookingService`, `ListingService`, `ChatService` - Encapsulate Firebase logic.
+*   **Models**: Strong typing with `UserModel`, `BookingModel`, `ListingModel`, `InspectionModel`, etc.
+
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-* [Flutter SDK](https://docs.flutter.dev/get-started/install) (latest stable version)
-* [Node.js](https://nodejs.org/) (for running the Admin Panel)
-* Android Studio or Xcode (for emulation/compilation)
-* A Firebase project configured with Auth, Firestore, and Storage.
+*   [Flutter SDK](https://docs.flutter.dev/get-started/install) (latest stable version).
+*   [Node.js](https://nodejs.org/) (for the Admin Panel).
+*   A Firebase project with Auth, Firestore, and Storage enabled.
 
-### Installation (Mobile App)
+### Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/alik12333/rozridesBU.git
-   cd rozridesBU
-   ```
+1.  **Clone & Install Mobile App**:
+    ```bash
+    git clone https://github.com/alik12333/rozridesBU.git
+    cd rozridesBU
+    flutter pub get
+    ```
+2.  **Configure Firebase**:
+    Place `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) in the appropriate directories.
+3.  **Run Mobile App**:
+    ```bash
+    flutter run
+    ```
+4.  **Setup Admin Panel**:
+    ```bash
+    cd admin_panel
+    npm install
+    # Configure .env.local with Firebase credentials
+    npm run dev
+    ```
 
-2. **Install dependencies:**
-   ```bash
-   flutter pub get
-   ```
-
-3. **Configure Firebase:**
-   Ensure you have your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) in their respective directories. You may need to run `flutterfire configure`.
-
-4. **Run the app:**
-   ```bash
-   flutter run
-   ```
-
-### Installation (Admin Panel)
-
-1. **Navigate to the admin portal directory:**
-   ```bash
-   cd admin_panel
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Set up Environment Variables:**
-   Create a `.env.local` file in the `admin_panel` directory containing your Firebase service account credentials and config.
-
-4. **Run the local development server:**
-   ```bash
-   npm run dev
-   ```
-   Access the dashboard at `http://localhost:3000` (or `3001` if configured differently).
+---
 
 ## 📂 Project Structure
 
 ```text
 rozridesBU/
 ├── lib/
-│   ├── core/         # Theming, constants, and shared utilities
-│   ├── models/       # Data classes (UserModel, BookingModel, ListingModel, etc.)
-│   ├── providers/    # State management providers
-│   ├── screens/      # UI screens divided by features (booking, host, trip, search, etc.)
-│   └── services/     # Firebase interaction logic
-├── admin_panel/      # Next.js web application for platform administration
-├── test/             # Unit and widget tests
-└── ios/ & android/   # Platform-specific native configurations
+│   ├── core/         # Theming (app_theme.dart), constants, and shared utilities.
+│   ├── models/       # Data models (UserModel, BookingModel, etc.) with serialization.
+│   ├── providers/    # Provider classes for global state management.
+│   ├── screens/      # Feature-based UI screens:
+│   │   ├── booking/  # Summary, Details, Confirmation, Cancellation.
+│   │   ├── host/     # Request management, Location picker.
+│   │   ├── trip/     # Inspections, Active Trip, Settlement.
+│   │   └── search/   # Map-based discovery.
+│   └── services/     # API/Firebase wrappers for Auth, Bookings, Chat, etc.
+├── admin_panel/      # Next.js web portal for administration.
+└── graphify-out/     # Automated code graph analysis and reports.
 ```
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please follow these steps:
-1. Fork the project.
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request.
+## 🤝 Contributing
+1. Fork the repo.
+2. Create a feature branch.
+3. Submit a Pull Request.
 
 ## 📄 License
-This project is proprietary. All rights reserved.
+Proprietary - All rights reserved.
 
 ---
 *Generated & maintained with ❤️ by the RozRides Team.*
