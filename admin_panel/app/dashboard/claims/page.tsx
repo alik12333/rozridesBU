@@ -92,11 +92,13 @@ export default function ClaimsPage() {
         const map: Record<string, string> = {
             open: 'bg-red-100 text-red-700 border-red-200',
             admin_reviewing: 'bg-orange-100 text-orange-700 border-orange-200',
+            decided: 'bg-yellow-100 text-yellow-700 border-yellow-200',
             resolved: 'bg-green-100 text-green-700 border-green-200',
         };
         const label: Record<string, string> = {
             open: 'Open',
             admin_reviewing: 'Reviewing',
+            decided: 'Awaiting Confirmation',
             resolved: 'Resolved',
         };
         return (
@@ -106,11 +108,12 @@ export default function ClaimsPage() {
         );
     };
 
-    // Sort order: open -> admin_reviewing -> resolved
+    // Sort order: open -> admin_reviewing -> decided -> resolved
     const statusOrder: Record<string, number> = {
         'open': 1,
         'admin_reviewing': 2,
-        'resolved': 3
+        'decided': 3,
+        'resolved': 4,
     };
 
     const sortedClaims = [...claims].sort((a, b) => {
@@ -133,7 +136,7 @@ export default function ClaimsPage() {
 
             {/* Filter pills */}
             <div className="flex gap-2 flex-wrap">
-                {['all', 'open', 'admin_reviewing', 'resolved'].map(f => (
+                {['all', 'open', 'admin_reviewing', 'decided', 'resolved'].map(f => (
                     <Button
                         key={f}
                         variant={filter === f ? 'default' : 'outline'}

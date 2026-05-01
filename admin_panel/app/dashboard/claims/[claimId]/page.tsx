@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase-client';
-import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CheckCircle, XCircle, Handshake, ArrowLeft } from 'lucide-react';
@@ -16,9 +16,14 @@ interface ClaimData {
     renterId: string;
     hostClaimedAmount: number;
     status: string;
+    adminDecision: string | null;
     resolvedInFavorOf: string | null;
     finalDeductionAmount: number | null;
+    extraChargeAmount: number;
+    requiresExtraPayment: boolean;
     adminNotes: string | null;
+    hostConfirmed: boolean;
+    renterConfirmed: boolean;
     depositAmount?: number;
 }
 
@@ -219,11 +224,17 @@ export default function ClaimReviewPage() {
         try {
             const res = await fetch(`/api/claims/${claim.claimId}/force-close`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    bookingId: claim.bookingId,
+                    adminReason: 'Admin manually closed this trip due to unresponsive parties.',
+                }),
             });
             if (res.ok) {
                 alert('Trip force closed successfully.');
             } else {
-                alert('Failed to force close trip.');
+                const err = await res.json();
+                alert(`Failed to force close: ${err.error}`);
             }
         } catch (e) {
             console.error(e);
@@ -347,15 +358,41 @@ export default function ClaimReviewPage() {
                         <p className="text-sm mt-2">Awaiting cash confirmation from both parties in the mobile app.</p>
                     </div>
                 ) : claim.status === 'decided' ? (
-                    <div className="bg-blue-50 border border-blue-200 rounded p-4 text-blue-800 flex justify-between items-center">
-                        <div>
-                            <p className="font-bold mb-1">Decision Posted</p>
-                            <p className="text-sm">Admin ruled: <strong>{claim.resolvedInFavorOf?.toUpperCase()}</strong></p>
-                            <p className="text-sm mt-2">Awaiting cash confirmation from both parties in the mobile app.</p>
+                    <div className="space-y-4">
+                        {/* Decision summary */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p className="font-bold text-blue-900 mb-1">Decision Posted</p>
+                            <p className="text-sm text-blue-800">
+                                Admin ruled: <strong className="uppercase">{claim.adminDecision || claim.resolvedInFavorOf}</strong>
+                                {claim.finalDeductionAmount ? ` — PKR ${claim.finalDeductionAmount.toLocaleString()}` : ''}
+                                {claim.requiresExtraPayment ? ` + PKR ${claim.extraChargeAmount?.toLocaleString()} extra` : ''}
+                            </p>
                         </div>
-                        <Button variant="destructive" size="sm" onClick={handleForceCloseClick} disabled={!!processing}>
-                            FORCE CLOSE TRIP
-                        </Button>
+                        {/* Real-time confirmation tracker */}
+                        <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                            <p className="font-bold text-gray-800 mb-3 text-sm uppercase">Cash Settlement Confirmations</p>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-700">Host confirmed:</span>
+                                    {claim.hostConfirmed
+                                        ? <span className="text-green-600 font-bold text-sm">✅ Confirmed</span>
+                                        : <span className="text-amber-600 font-bold text-sm">❌ Pending</span>}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-700">Renter confirmed:</span>
+                                    {claim.renterConfirmed
+                                        ? <span className="text-green-600 font-bold text-sm">✅ Confirmed</span>
+                                        : <span className="text-amber-600 font-bold text-sm">❌ Pending</span>}
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-3">Trip closes automatically when both parties confirm in the mobile app.</p>
+                        </div>
+                        {/* Admin force close */}
+                        <div className="flex justify-end">
+                            <Button variant="destructive" size="sm" onClick={handleForceCloseClick} disabled={!!processing}>
+                                {processing === 'force-close' ? 'Closing...' : '⚡ Force Close Trip'}
+                            </Button>
+                        </div>
                     </div>
                 ) : (
                     <div className="flex gap-6">

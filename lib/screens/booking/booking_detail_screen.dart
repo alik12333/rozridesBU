@@ -1,14 +1,17 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/booking_model.dart';
+import '../../models/damage_claim_model.dart';
 import '../../models/post_inspection_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../utils/booking_status_utils.dart';
+import '../renter/my_bookings_screen.dart';
 import '../trip/active_trip_screen.dart';
 import '../trip/cash_settlement_screen.dart';
 import '../trip/post_trip_inspection_screen.dart';
@@ -27,13 +30,16 @@ class BookingDetailScreen extends StatefulWidget {
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final BookingService _service = BookingService();
   late final Stream<BookingModel?> _bookingStream;
+  late final Stream<DamageClaim?> _claimStream;
   Map<String, dynamic>? _otherPartyData;
   Timer? _timer;
+  bool _isConfirming = false;
 
   @override
   void initState() {
     super.initState();
     _bookingStream = _service.streamBooking(widget.bookingId);
+    _claimStream = _service.streamClaimForBooking(widget.bookingId);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -377,33 +383,26 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost) {
     if (booking.status == 'flagged') {
-      return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))],
-        ),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.purple.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.purple.shade200),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.gavel, color: Colors.purple.shade600),
-              const SizedBox(height: 8),
-              Text(
-                'This trip is under review. RozRides admin will notify you of the outcome within 24 hours.\n\nDo not exchange any cash until you receive the admin\'s decision.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.purple.shade900, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
-              ),
-            ],
-          ),
-        ),
+      return StreamBuilder<DamageClaim?>(
+        stream: _claimStream,
+        builder: (context, claimSnap) {
+          final claim = claimSnap.data;
+
+          // Under review — no decision yet
+          if (claim == null ||
+              claim.status == 'open' ||
+              claim.status == 'admin_reviewing') {
+            return _flaggedUnderReviewBar();
+          }
+
+          // Decision posted — show card + confirmation button
+          if (claim.status == 'decided') {
+            return _flaggedDecidedBar(context, booking, claim, isHost);
+          }
+
+          // Already resolved — no action needed
+          return const SizedBox.shrink();
+        },
       );
     }
 
@@ -767,4 +766,251 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
         child: Icon(Icons.directions_car, color: Colors.grey.shade400, size: 32),
       );
+
+  // ─────────────── DISPUTE 2.0 HELPERS ────────────────────────────────────
+
+  Widget _flaggedUnderReviewBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))],
+      ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.purple.shade50,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.purple.shade200),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.gavel_rounded, color: Colors.purple.shade600, size: 32),
+            const SizedBox(height: 10),
+            Text('Under Review', style: GoogleFonts.outfit(
+              color: Colors.purple.shade900, fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text(
+              'RozRides admin is reviewing this trip. You will be notified of the outcome.\n\nDo not exchange any cash until you receive the admin\'s decision.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.purple.shade700, fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _flaggedDecidedBar(BuildContext context, BookingModel booking, DamageClaim claim, bool isHost) {
+    final instructions = _getDecisionInstructions(
+      adminDecision: claim.adminDecision ?? '',
+      finalDeductionAmount: claim.finalDeductionAmount ?? 0,
+      extraChargeAmount: claim.extraChargeAmount,
+      depositAmount: booking.securityDeposit,
+      isHost: isHost,
+    );
+
+    final userConfirmed = isHost ? claim.hostConfirmed : claim.renterConfirmed;
+    final otherConfirmed = isHost ? claim.renterConfirmed : claim.hostConfirmed;
+    final otherLabel = isHost ? 'renter' : 'host';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Decision Card
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [const Color(0xFF7C3AED).withValues(alpha: 0.85), const Color(0xFF5B21B6).withValues(alpha: 0.9)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.gavel_rounded, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Admin Decision', style: GoogleFonts.outfit(
+                          color: Colors.white.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w600)),
+                    ]),
+                    const SizedBox(height: 10),
+                    Text(instructions['title']!, style: GoogleFonts.outfit(
+                        color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(instructions['body']!, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13, height: 1.5)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Confirmation area
+          if (!userConfirmed) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isConfirming ? null : () => _confirmSettlement(context, booking, claim, isHost),
+                icon: _isConfirming
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_rounded),
+                label: Text(_isConfirming ? 'Confirming…' : 'I CONFIRM I HAVE SETTLED MY PART',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ] else if (!otherConfirmed) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(children: [
+                Icon(Icons.check_circle_rounded, color: Colors.green.shade500, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(
+                  'You confirmed. Waiting for the $otherLabel to confirm.',
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13, fontWeight: FontWeight.w600),
+                )),
+              ]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Map<String, String> _getDecisionInstructions({
+    required String adminDecision,
+    required double finalDeductionAmount,
+    required double extraChargeAmount,
+    required double depositAmount,
+    required bool isHost,
+  }) {
+    final dep = 'PKR ${depositAmount.toStringAsFixed(0)}';
+    final fin = 'PKR ${finalDeductionAmount.toStringAsFixed(0)}';
+    final ret = 'PKR ${(depositAmount - finalDeductionAmount).toStringAsFixed(0)}';
+    final extra = 'PKR ${extraChargeAmount.toStringAsFixed(0)}';
+
+    switch (adminDecision) {
+      case 'renter':
+        return isHost
+            ? {'title': 'Return Full Deposit', 'body': 'Admin reviewed the evidence and found no valid damage claim. You must return $dep to the renter in cash.'}
+            : {'title': 'Full Deposit Returned to You', 'body': 'Admin reviewed the evidence and ruled in your favor. The host must return $dep to you in cash.'};
+      case 'host':
+        return isHost
+            ? {'title': 'You Keep $fin', 'body': 'Admin upheld your damage claim. You may keep $fin from the deposit. Return the remaining $ret to the renter.'}
+            : {'title': 'Deduction Approved', 'body': 'Admin reviewed the evidence and upheld the host\'s claim. Host keeps $fin. You receive $ret back.'};
+      case 'split':
+        return isHost
+            ? {'title': 'Keep $fin', 'body': 'Admin determined a fair deduction of $fin. Keep this amount and return $ret to the renter.'}
+            : {'title': 'Partial Deduction Applied', 'body': 'Admin determined a fair deduction of $fin. You receive $ret back from the host.'};
+      case 'extra':
+        return isHost
+            ? {'title': 'Keep Full Deposit + Collect Extra', 'body': 'Admin determined the damage exceeds the deposit. You keep the full $dep deposit AND the renter must pay you an additional $extra in cash.'}
+            : {'title': 'Additional Payment Required', 'body': 'Admin determined the damage exceeds the deposit. The host keeps your full $dep deposit AND you must pay an additional $extra to the host in cash.'};
+      default:
+        return {'title': 'Decision Posted', 'body': 'Admin has posted a decision. Please check your notifications for details.'};
+    }
+  }
+
+  Future<void> _confirmSettlement(BuildContext context, BookingModel booking, DamageClaim claim, bool isHost) async {
+    // Capture context-dependent refs BEFORE any awaits
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final userId = context.read<AuthProvider>().currentUser!.id;
+    final userRole = isHost ? 'host' : 'renter';
+
+    final isExtraRenter = claim.adminDecision == 'extra' && !isHost;
+    final title = isExtraRenter ? 'Confirm Extra Payment' : 'Confirm Settlement';
+    final body = isExtraRenter
+        ? 'By confirming, you are stating that you have paid PKR ${claim.extraChargeAmount.toStringAsFixed(0)} to the host in cash. This cannot be undone.'
+        : 'By confirming, you are stating that you have physically settled the cash as instructed. This cannot be undone.';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(body, style: const TextStyle(fontSize: 14, height: 1.5)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade600, foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, I Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+
+    setState(() => _isConfirming = true);
+    try {
+      final result = await _service.confirmDisputeSettlement(
+        claimId: claim.claimId,
+        bookingId: booking.id,
+        confirmingUserId: userId,
+        userRole: userRole,
+      );
+
+      if (!mounted) return;
+      if (result['bothConfirmed'] == true) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Trip fully settled and closed. 🎉'),
+          backgroundColor: Colors.green,
+        ));
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          navigator.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MyBookingsScreen()),
+            (route) => route.isFirst,
+          );
+        }
+      } else {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Your confirmation recorded. Waiting for the other party.'),
+          backgroundColor: Colors.blue,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isConfirming = false);
+    }
+  }
 }
+

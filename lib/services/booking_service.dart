@@ -1137,9 +1137,16 @@ class BookingService {
       renterId: renterId,
       hostClaimedAmount: hostClaimedAmount,
       status: 'open',
+      adminDecision: null,
       resolvedInFavorOf: null,
       finalDeductionAmount: null,
+      requiresExtraPayment: false,
+      extraChargeAmount: 0,
       adminNotes: null,
+      hostConfirmed: false,
+      renterConfirmed: false,
+      hostConfirmedAt: null,
+      renterConfirmedAt: null,
       createdAt: DateTime.now(),
       resolvedAt: null,
     );
@@ -1230,6 +1237,128 @@ class BookingService {
 
     await batch.commit();
     return claimRef.id;
+  }
+
+  // ─────────────── CONFIRM DISPUTE SETTLEMENT (Dispute 2.0) ───────────────
+
+  /// Called by host or renter to confirm they have physically settled cash.
+  /// When both parties confirm, the trip closes automatically.
+  Future<Map<String, bool>> confirmDisputeSettlement({
+    required String claimId,
+    required String bookingId,
+    required String confirmingUserId,
+    required String userRole, // 'host' | 'renter'
+  }) async {
+    final claimRef = _firestore.collection('damageClaims').doc(claimId);
+    final bookingRef = _firestore.collection('bookings').doc(bookingId);
+    final now = FieldValue.serverTimestamp();
+
+    // Step 1: Determine field names
+    final confirmedField = userRole == 'host' ? 'hostConfirmed' : 'renterConfirmed';
+    final confirmedAtField = userRole == 'host' ? 'hostConfirmedAt' : 'renterConfirmedAt';
+
+    // Step 2: Write the confirmation
+    await claimRef.update({
+      confirmedField: true,
+      confirmedAtField: now,
+    });
+
+    // Step 3: Re-read to check if both have now confirmed
+    final updatedSnap = await claimRef.get();
+    if (!updatedSnap.exists) return {'bothConfirmed': false, 'tripClosed': false};
+
+    final data = updatedSnap.data()!;
+    final hostConfirmed = data['hostConfirmed'] as bool? ?? false;
+    final renterConfirmed = data['renterConfirmed'] as bool? ?? false;
+    final hostId = data['hostId'] as String? ?? '';
+    final renterId = data['renterId'] as String? ?? '';
+    final bookingSnap = await bookingRef.get();
+    final bookingData = bookingSnap.data() ?? {};
+    final carId = bookingData['carId'] as String? ?? '';
+    final startDate = bookingData['startDate'];
+    final endDate = bookingData['endDate'];
+
+    // Step 4: Both confirmed → close the trip
+    if (hostConfirmed && renterConfirmed) {
+      final batch = _firestore.batch();
+
+      // Mark claim resolved
+      batch.update(claimRef, {
+        'status': 'resolved',
+        'resolvedAt': now,
+      });
+
+      // Mark booking completed
+      batch.update(bookingRef, {
+        'status': 'completed',
+        'updatedAt': now,
+      });
+
+      // Remove date range from car
+      if (carId.isNotEmpty && startDate != null && endDate != null) {
+        final carRef = _firestore.collection('listings').doc(carId);
+        batch.update(carRef, {
+          'bookedDateRanges': FieldValue.arrayRemove([{
+            'start': startDate,
+            'end': endDate,
+            'bookingId': bookingId,
+          }]),
+        });
+      }
+
+      // Timeline event
+      _addTimelineEvent(
+        batch, bookingId, 'completed',
+        'Both parties confirmed cash settlement. Dispute resolved. Trip closed.',
+        confirmingUserId,
+      );
+
+      // Notify host
+      final hostNotif = _firestore.collection('users').doc(hostId).collection('notifications').doc();
+      batch.set(hostNotif, {
+        'type': 'trip_completed',
+        'title': 'Trip Closed',
+        'body': 'Both parties confirmed the settlement. This trip is now complete.',
+        'bookingId': bookingId,
+        'isRead': false,
+        'isUnread': true,
+        'createdAt': now,
+      });
+
+      // Notify renter
+      final renterNotif = _firestore.collection('users').doc(renterId).collection('notifications').doc();
+      batch.set(renterNotif, {
+        'type': 'trip_completed',
+        'title': 'Trip Closed',
+        'body': 'Both parties confirmed the settlement. This trip is now complete.',
+        'bookingId': bookingId,
+        'isRead': false,
+        'isUnread': true,
+        'createdAt': now,
+      });
+
+      await batch.commit();
+      return {'bothConfirmed': true, 'tripClosed': true};
+    }
+
+    // Step 4b: Only one confirmed — nothing more to do yet
+    return {'bothConfirmed': false, 'tripClosed': false};
+  }
+
+  // ──────────────── STREAM CLAIM FOR BOOKING (Dispute 2.0) ────────────────
+
+  /// Returns a real-time stream of the damage claim associated with [bookingId].
+  Stream<DamageClaim?> streamClaimForBooking(String bookingId) {
+    return _firestore
+        .collection('damageClaims')
+        .where('bookingId', isEqualTo: bookingId)
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+          if (snap.docs.isEmpty) return null;
+          final doc = snap.docs.first;
+          return DamageClaim.fromMap(doc.data(), doc.id);
+        });
   }
 
   // ──────────────────────────── SUBMIT REVIEW ────────────────────────────
