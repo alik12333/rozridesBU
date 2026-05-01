@@ -5,7 +5,12 @@ if (!admin.apps.length) {
         // Load credentials from environment variables (secure)
         const projectId = process.env.FIREBASE_PROJECT_ID;
         const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+        
+        let rawKey = process.env.FIREBASE_PRIVATE_KEY;
+        if (rawKey && rawKey.startsWith('"') && rawKey.endsWith('"')) {
+            rawKey = rawKey.substring(1, rawKey.length - 1);
+        }
+        const privateKey = rawKey?.replace(/\\n/g, '\n');
 
         // Validate required environment variables
         if (!projectId || !clientEmail || !privateKey) {

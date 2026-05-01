@@ -53,9 +53,13 @@ export default function CNICPage() {
             const res = await fetch(`/api/cnic/${userId}/approve`, { method: 'POST' });
             if (res.ok) {
                 await fetchCNICData();
+            } else {
+                const data = await res.json();
+                alert(`Failed to approve: ${data.error} \nDetails: ${data.details || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Error approving CNIC:', error);
+            alert(`Network error approving CNIC: ${error}`);
         } finally {
             setProcessing(null);
         }
@@ -67,9 +71,13 @@ export default function CNICPage() {
             const res = await fetch(`/api/cnic/${userId}/reject`, { method: 'POST' });
             if (res.ok) {
                 await fetchCNICData();
+            } else {
+                const data = await res.json();
+                alert(`Failed to reject: ${data.error} \nDetails: ${data.details || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Error rejecting CNIC:', error);
+            alert(`Network error rejecting CNIC: ${error}`);
         } finally {
             setProcessing(null);
         }

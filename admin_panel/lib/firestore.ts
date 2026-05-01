@@ -196,10 +196,12 @@ export async function updateCNICStatus(
     userId: string,
     status: 'approved' | 'rejected'
 ): Promise<void> {
-    await adminDb.collection('users').doc(userId).update({
-        'cnic.verificationStatus': status,
+    await adminDb.collection('users').doc(userId).set({
+        cnic: {
+            verificationStatus: status,
+        },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    }, { merge: true });
 
     // Send notification
     const title = status === 'approved' ? 'Profile Verified' : 'Profile Verification Failed';
