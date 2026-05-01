@@ -6,6 +6,7 @@ class PricingCalculator {
     required DateTime endDate,
     required double pricePerDay,
     double securityDeposit = 10000.0,
+    bool withDriver = false,
   }) {
     final int totalDays = endDate.difference(startDate).inDays + 1;
 
@@ -13,11 +14,13 @@ class PricingCalculator {
       throw Exception('Invalid date range: totalDays must be greater than zero.');
     }
 
-    final double totalRent = pricePerDay * totalDays;
+    final double driverFeePerDay = withDriver ? 2000.0 : 0.0;
+    final double totalRent = (pricePerDay + driverFeePerDay) * totalDays;
 
     return CashPricingBreakdown(
       totalDays: totalDays,
       pricePerDay: pricePerDay,
+      driverFeePerDay: driverFeePerDay,
       totalRent: totalRent,
       securityDeposit: securityDeposit,
       depositAtPickup: securityDeposit,  // Renter brings this cash to give host at pickup

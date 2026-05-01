@@ -8,6 +8,7 @@ import '../../models/booking_model.dart';
 import '../../models/inspection_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+import '../chat/chat_screen.dart';
 import 'post_trip_inspection_screen.dart';
 
 class ActiveTripScreen extends StatefulWidget {
@@ -277,14 +278,24 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   Widget _quickActions(
-      {required bool isHost, required String bookingId, required String otherName}) {
+      {required bool isHost, required BookingModel booking, required String otherName}) {
+    final currentUserId = context.read<AuthProvider>().currentUser?.id ?? '';
+    final conversationId = '${booking.carId}_${booking.renterId}';
+
     return Row(children: [
       Expanded(
           child: _actionBtn(
         icon: Icons.chat_bubble_outline,
         label: isHost ? 'Message\nRenter' : 'Message\nHost',
-        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chat coming in Phase 10'))),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: conversationId,
+              currentUserId: currentUserId,
+            ),
+          ),
+        ),
       )),
       const SizedBox(width: 10),
       Expanded(
@@ -444,7 +455,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             // Quick actions
             _quickActions(
                 isHost: false,
-                bookingId: booking.id,
+                booking: booking,
                 otherName: 'Host'),
             const SizedBox(height: 12),
 
@@ -615,7 +626,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
           // Quick actions
           _quickActions(
-              isHost: true, bookingId: booking.id, otherName: booking.renterName),
+              isHost: true, booking: booking, otherName: booking.renterName),
           const SizedBox(height: 12),
 
           // Complete return button

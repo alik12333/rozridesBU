@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geoflutterfire_plus/geoflutterfire_plus.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../models/listing_model.dart';
 import '../car_detail_screen.dart';
 import '../search_screen.dart';
@@ -23,6 +24,9 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
 
   final Completer<GoogleMapController> _mapController = Completer();
   final ScrollController _listScrollController = ScrollController();
+  final PageController _pageController = PageController(viewportFraction: 0.85);
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchingLocation = false;
 
   Position? _currentPosition;
   double _searchRadius = 15.0;
@@ -61,41 +65,67 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
   void dispose() {
     _geoSubscription?.cancel();
     _listScrollController.dispose();
+    _pageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   // ─── Marker icons ──────────────────────────────────────────────────────────
 
-  Future<BitmapDescriptor> _buildDotIcon({
-    required double radius,
-    required Color fill,
-    required Color border,
+  Future<BitmapDescriptor> _buildCarIcon({
+    required double size,
+    required Color color,
+    required Color backgroundColor,
   }) async {
-    final size = (radius * 2 + 4).toInt();
+    final int canvasSize = (size * 1.8).toInt();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final center = Offset(radius + 2, radius + 2);
+    final center = Offset(canvasSize / 2, canvasSize / 2);
 
-    // White ring border
-    canvas.drawCircle(center, radius + 2, Paint()..color = border);
-    // Fill
-    canvas.drawCircle(center, radius, Paint()..color = fill);
+    // Background circle
+    canvas.drawCircle(center, canvasSize / 2, Paint()..color = backgroundColor);
+    // Border
+    canvas.drawCircle(
+      center,
+      canvasSize / 2,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
-    final image = await recorder.endRecording().toImage(size, size);
+    // Draw the car icon
+    TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(Icons.directions_car.codePoint),
+      style: TextStyle(
+        fontSize: size,
+        fontFamily: Icons.directions_car.fontFamily,
+        package: Icons.directions_car.fontPackage,
+        color: color,
+      ),
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(center.dx - textPainter.width / 2, center.dy - textPainter.height / 2),
+    );
+
+    final image = await recorder.endRecording().toImage(canvasSize, canvasSize);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _initMarkerIcons() async {
-    _defaultMarkerIcon = await _buildDotIcon(
-      radius: 10,
-      fill: Colors.black87,
-      border: Colors.white,
+    _defaultMarkerIcon = await _buildCarIcon(
+      size: 20,
+      color: Colors.white,
+      backgroundColor: Colors.black87,
     );
-    _selectedMarkerIcon = await _buildDotIcon(
-      radius: 14,
-      fill: const Color(0xFF7C3AED),
-      border: Colors.white,
+    _selectedMarkerIcon = await _buildCarIcon(
+      size: 26,
+      color: Colors.white,
+      backgroundColor: const Color(0xFF7C3AED),
     );
   }
 
@@ -281,12 +311,56 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
   }
 
   void _scrollToCard(int index) {
-    if (_listScrollController.hasClients) {
-      _listScrollController.animateTo(
-        index * 132.0,
-        duration: const Duration(milliseconds: 400),
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  void _onPageChanged(int index) async {
+    if (_carsInRadius.isEmpty) return;
+    final car = _carsInRadius[index];
+    setState(() => _selectedListingId = car.id);
+    _rebuildMarkers();
+
+    if (car.location != null && _mapController.isCompleted) {
+      final controller = await _mapController.future;
+      controller.animateCamera(
+        CameraUpdate.newCameraPosition(CameraPosition(
+          target: LatLng(car.location!.latitude, car.location!.longitude),
+          zoom: 15,
+        )),
+      );
+    }
+  }
+
+  Future<void> _searchArea(String query) async {
+    if (query.trim().isEmpty) return;
+    setState(() => _isSearchingLocation = true);
+    try {
+      final searchString = '$query, Pakistan';
+      final locations = await locationFromAddress(searchString);
+      if (locations.isNotEmpty) {
+        final loc = locations.first;
+        if (_mapController.isCompleted) {
+          final controller = await _mapController.future;
+          controller.animateCamera(CameraUpdate.newLatLngZoom(
+            LatLng(loc.latitude, loc.longitude),
+            14,
+          ));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location not found. Try a different area.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSearchingLocation = false);
     }
   }
 
@@ -325,7 +399,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
           ),
         ],
       ),
-      body: _isMapMode ? _buildSplitView() : const SearchScreen(isEmbedded: true),
+      body: _isMapMode ? _buildMapLayout() : const SearchScreen(isEmbedded: true),
     );
   }
 
@@ -344,42 +418,135 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     );
   }
 
-  Widget _buildSplitView() {
-    return Column(children: [
-      // ── TOP: Google Map ───────────────────────────────────────────────────
-      Expanded(
-        flex: 5,
-        child: GoogleMap(
+  Widget _buildMapLayout() {
+    return Stack(
+      children: [
+        // ── Background: Full Screen Map ──────────────────────────────────────
+        GoogleMap(
           initialCameraPosition: CameraPosition(
             target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
             zoom: 13,
           ),
           myLocationEnabled: true,
-          myLocationButtonEnabled: true,
+          myLocationButtonEnabled: false, // We'll add our own custom button
+          mapToolbarEnabled: false,
+          zoomControlsEnabled: false,
           markers: _markers,
           onCameraIdle: _onCameraIdle,
           onMapCreated: (c) {
             if (!_mapController.isCompleted) _mapController.complete(c);
           },
         ),
-      ),
 
-      // ── BOTTOM: Listing cards ─────────────────────────────────────────────
-      Expanded(
-        flex: 5,
-        child: Container(
-          color: Colors.grey.shade50,
-          child: _carsInRadius.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  controller: _listScrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: _carsInRadius.length,
-                  itemBuilder: (context, i) => _buildCard(i, _carsInRadius[i]),
+        // ── Top: Floating Search Bar ─────────────────────────────────────────
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: Colors.grey.shade600),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search area (e.g., DHA Phase 6)',
+                      hintStyle: TextStyle(color: Colors.grey.shade400),
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: _searchArea,
+                  ),
                 ),
+                if (_isSearchingLocation)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: Icon(Icons.arrow_forward, color: Theme.of(context).primaryColor),
+                    onPressed: () => _searchArea(_searchController.text),
+                  ),
+              ],
+            ),
+          ),
         ),
-      ),
-    ]);
+
+        // ── Right: My Location FAB ───────────────────────────────────────────
+        Positioned(
+          bottom: _carsInRadius.isEmpty ? 32 : 160,
+          right: 16,
+          child: FloatingActionButton(
+            heroTag: 'my_location_btn',
+            backgroundColor: Colors.white,
+            mini: true,
+            onPressed: () async {
+              if (_currentPosition != null && _mapController.isCompleted) {
+                final controller = await _mapController.future;
+                controller.animateCamera(CameraUpdate.newLatLngZoom(
+                  LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  14,
+                ));
+              }
+            },
+            child: Icon(Icons.my_location, color: Colors.grey.shade800),
+          ),
+        ),
+
+        // ── Bottom: Horizontal Cards ─────────────────────────────────────────
+        if (_carsInRadius.isEmpty)
+          Positioned(
+            bottom: 32,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                  )
+                ],
+              ),
+              child: _buildEmptyState(),
+            ),
+          )
+        else
+          Positioned(
+            bottom: 24,
+            left: 0,
+            right: 0,
+            height: 120,
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              itemCount: _carsInRadius.length,
+              itemBuilder: (context, i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: _buildCard(i, _carsInRadius[i]),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildEmptyState() {
@@ -409,8 +576,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
       ),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        height: 120,
-        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -420,7 +585,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isSelected ? 0.10 : 0.05),
+              color: Colors.black.withOpacity(isSelected ? 0.2 : 0.1),
               blurRadius: isSelected ? 16 : 8,
               offset: const Offset(0, 4),
             ),

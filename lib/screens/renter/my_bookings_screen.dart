@@ -7,6 +7,7 @@ import '../../models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../booking/booking_detail_screen.dart';
+import '../reviews/submit_review_screen.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -308,7 +309,9 @@ class _BookingCardState extends State<_BookingCard> {
         final reviewDone = b.reviewStatus['renterSubmitted'] == true;
         if (!reviewDone) {
           secondary = _outlineBtn('Leave Review', Colors.amber.shade700, () =>
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reviews in Phase 9'))));
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => SubmitReviewScreen(booking: b, reviewType: 'renter_to_host'),
+              )));
         }
         primary = _fillBtn('View Details', Colors.grey.shade600, () =>
             Navigator.push(context, MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id))));

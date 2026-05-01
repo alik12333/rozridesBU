@@ -394,11 +394,35 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Pay host (car rental)',
-                                style: TextStyle(fontSize: 15)),
-                            Text(_formatPKR(widget.pricing.payAtReturn),
+                            Text('Car rental (${widget.pricing.totalDays} days)',
+                                style: const TextStyle(fontSize: 15)),
+                            Text(_formatPKR(widget.pricing.pricePerDay * widget.pricing.totalDays),
                                 style: const TextStyle(
                                     fontSize: 15, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        if (widget.pricing.driverFeePerDay > 0) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Driver fee (${widget.pricing.totalDays} days)',
+                                  style: const TextStyle(fontSize: 15)),
+                              Text(_formatPKR(widget.pricing.driverFeePerDay * widget.pricing.totalDays),
+                                  style: const TextStyle(
+                                      fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Pay host total at return',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                            Text(_formatPKR(widget.pricing.payAtReturn),
+                                style: const TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
                           ],
                         ),
                         const SizedBox(height: 8),

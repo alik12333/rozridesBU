@@ -4,7 +4,10 @@ class CashPricingBreakdown {
   final int totalDays;
   final double pricePerDay;
 
-  /// Total rental cost = pricePerDay × totalDays
+  /// Driver fee per day (0 if no driver)
+  final double driverFeePerDay;
+
+  /// Total rental cost = (pricePerDay + driverFeePerDay) × totalDays
   final double totalRent;
 
   /// Fixed security deposit set by the platform
@@ -25,6 +28,7 @@ class CashPricingBreakdown {
   const CashPricingBreakdown({
     required this.totalDays,
     required this.pricePerDay,
+    required this.driverFeePerDay,
     required this.totalRent,
     required this.securityDeposit,
     required this.depositAtPickup,

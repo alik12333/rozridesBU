@@ -265,8 +265,8 @@ class _HostBookingCard extends StatelessWidget {
     } else if (b.status == 'active') {
       label = 'Complete Return';
       color = Colors.blue.shade700;
-      onTap = () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Return flow — Phase 5')));
+      onTap = () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => BookingDetailScreen(bookingId: b.id)));
     } else if (b.status == 'pending') {
       label = 'View Request';
       color = const Color(0xFF7C3AED);

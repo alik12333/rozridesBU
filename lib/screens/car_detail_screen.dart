@@ -12,6 +12,7 @@ import 'booking/booking_summary_screen.dart';
 import 'reviews/all_reviews_screen.dart';
 import '../services/chat_service.dart';
 import 'chat/chat_screen.dart';
+import 'car_location_map_screen.dart';
 
 class CarDetailScreen extends StatefulWidget {
   final ListingModel listing;
@@ -49,6 +50,7 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
           endDate: _selectedEnd!,
           pricePerDay: widget.listing.pricePerDay,
           securityDeposit: 10000.0, // Fixed PKR 10k standard deposit for MVP based on PDF
+          withDriver: widget.listing.withDriver,
         );
         setState(() { _pricingEstimate = estimate; });
       } catch (e) {
@@ -376,15 +378,35 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(Icons.location_on, color: Colors.red.shade400),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${widget.listing.area ?? ''}, ${widget.listing.city ?? ''}',
-                              style: const TextStyle(fontSize: 16),
+                        InkWell(
+                          onTap: widget.listing.location != null ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => CarLocationMapScreen(
+                                  location: widget.listing.location!,
+                                  carName: widget.listing.carName,
+                                ),
+                              ),
+                            );
+                          } : null,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(Icons.location_on, color: Colors.red.shade400),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${widget.listing.area ?? ''}, ${widget.listing.city ?? ''}',
+                                    style: TextStyle(fontSize: 16, color: widget.listing.location != null ? Theme.of(context).primaryColor : Colors.black),
+                                  ),
+                                ),
+                                if (widget.listing.location != null)
+                                  Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).primaryColor),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 24),
                         const Divider(),
@@ -392,12 +414,34 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                       ],
 
                       const SizedBox(height: 24),
-                      const Text(
-                        'Availability',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Availability',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _selectedStart = DateTime.now();
+                                _selectedEnd = DateTime.now();
+                              });
+                              _updatePricing();
+                            },
+                            icon: const Icon(Icons.flash_on, size: 16),
+                            label: const Text('1 Day (Today)'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                              foregroundColor: const Color(0xFF7C3AED),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       AvailabilityCalendar(
@@ -435,9 +479,19 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('${_pricingEstimate!.totalDays} days x PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16)),
-                                  Text('PKR ${_pricingEstimate!.totalRent.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  Text('PKR ${(_pricingEstimate!.pricePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                                 ],
                               ),
+                              if (_pricingEstimate!.driverFeePerDay > 0) ...[
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Driver fee (${_pricingEstimate!.totalDays} days x PKR ${_pricingEstimate!.driverFeePerDay.toStringAsFixed(0)})', style: const TextStyle(fontSize: 16)),
+                                    Text('PKR ${(_pricingEstimate!.driverFeePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ],
                               const SizedBox(height: 12),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
