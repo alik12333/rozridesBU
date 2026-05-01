@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -52,20 +54,42 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
-        title: Text('My Bookings', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text('My Bookings', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22)),
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         surfaceTintColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFF7C3AED),
-          labelColor: const Color(0xFF7C3AED),
-          unselectedLabelColor: Colors.grey.shade600,
-          labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
-          unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
-          tabs: _tabs.map((t) => Tab(text: t)).toList(),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: const Color(0xFF7C3AED),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.grey.shade600,
+              labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+              unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+              tabs: _tabs.map((t) => Tab(text: t)).toList(),
+            ),
+          ),
         ),
       ),
       body: Consumer<BookingProvider>(
@@ -96,12 +120,22 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.car_rental_rounded, size: 72, color: Colors.grey.shade300),
-          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.car_rental_rounded, size: 64, color: Color(0xFF7C3AED)),
+          ),
+          const SizedBox(height: 24),
           Text(msgs[i].$1,
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+              style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
           const SizedBox(height: 8),
-          Text(msgs[i].$2, style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(msgs[i].$2, style: TextStyle(color: Colors.grey.shade600, fontSize: 14), textAlign: TextAlign.center),
+          ),
         ],
       ),
     );
@@ -201,30 +235,91 @@ class _BookingCardState extends State<_BookingCard> {
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           border: b.status == 'pending'
               ? Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3), width: 1.5)
-              : null,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 3))],
+              : Border.all(color: Colors.grey.shade200),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 8))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status banner
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Row(
+            // Car Image Header with Glassmorphism Status Ribbon
+            SizedBox(
+              height: 160,
+              width: double.infinity,
+              child: Stack(
                 children: [
-                  Icon(_statusIcon(b.status), size: 18, color: color),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_statusLabel(b.status),
-                      style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13))),
-                  if (b.status == 'pending' && remaining > Duration.zero)
-                    _countdownChip(remaining, color),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: b.carPhoto.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: b.carPhoto,
+                            width: double.infinity,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                            errorWidget: (context, url, error) => Container(color: Colors.grey.shade200),
+                          )
+                        : Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(child: Icon(Icons.directions_car_rounded, size: 48, color: Colors.grey)),
+                          ),
+                  ),
+                  // Gradient Overlay
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.4),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.5],
+                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                    ),
+                  ),
+                  // Glassmorphism Status Ribbon
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(_statusIcon(b.status), size: 14, color: Colors.white),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(_statusLabel(b.status),
+                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
+                              if (b.status == 'pending' && remaining > Duration.zero)
+                                _countdownChip(remaining, Colors.white),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -251,14 +346,21 @@ class _BookingCardState extends State<_BookingCard> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _pillBadge('${b.totalDays} day${b.totalDays > 1 ? 's' : ''}'),
-                      Text('PKR ${b.totalRent.toStringAsFixed(0)}',
-                          style: GoogleFonts.outfit(
-                              fontSize: 18, fontWeight: FontWeight.bold,
-                              color: const Color(0xFF7C3AED))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('PKR ${b.totalRent.toStringAsFixed(0)}',
+                            style: GoogleFonts.outfit(
+                                fontSize: 16, fontWeight: FontWeight.bold,
+                                color: const Color(0xFF7C3AED))),
+                      ),
                     ],
                   ),
                   if (_keyAmount(b).isNotEmpty) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
@@ -335,27 +437,40 @@ class _BookingCardState extends State<_BookingCard> {
     );
   }
 
-  Widget _fillBtn(String label, Color color, VoidCallback onTap) => ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 0,
+  Widget _fillBtn(String label, Color color, VoidCallback onTap) => Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            elevation: 0,
+          ),
+          child: Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
+        ),
       );
 
   Widget _outlineBtn(String label, Color color, VoidCallback onTap) => OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color.withValues(alpha: 0.6)),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: BorderSide(color: color.withValues(alpha: 0.3), width: 1.5),
+          backgroundColor: color.withValues(alpha: 0.05),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        child: Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
       );
 
   Widget _countdownChip(Duration r, Color color) {
@@ -364,7 +479,10 @@ class _BookingCardState extends State<_BookingCard> {
     final s = (r.inSeconds % 60).toString().padLeft(2, '0');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: color == Colors.white ? Colors.white.withValues(alpha: 0.2) : color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20)
+      ),
       child: Text('$h:$m:$s', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
     );
   }

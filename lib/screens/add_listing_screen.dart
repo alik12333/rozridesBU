@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -247,8 +248,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
     // Check verification status
     if (user?.cnic?.verificationStatus != 'approved') {
       return Scaffold(
+        backgroundColor: const Color(0xFFF7F8FC),
         appBar: AppBar(
-          title: const Text('Add New Listing'),
+          title: Text('Add New Car', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          surfaceTintColor: Colors.white,
           automaticallyImplyLeading: false,
         ),
         body: Center(
@@ -283,28 +289,38 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
-        title: const Text('Add New Listing'),
+        title: Text('Add New Car', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Images Section
-              const Text(
-                'Car Images',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Add 3-10 clear images of your car',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 12),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16).copyWith(bottom: Platform.isIOS ? 32 : 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -4))],
+        ),
+        child: CustomButton(
+          text: 'Add Car',
+          onPressed: _isSubmitting ? () {} : _submitListing,
+          isLoading: _isSubmitting,
+          icon: Icons.check_circle_rounded,
+        ),
+      ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            // Images Section
+            _buildSection(
+              title: 'Car Images',
+              subtitle: 'Add 3-10 clear images of your car',
+              children: [
 
               if (_images.isEmpty)
                 GestureDetector(
@@ -313,16 +329,24 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     height: 150,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400, width: 2),
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.grey.shade100,
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.05),
+                      border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.3), width: 2),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Column(
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Tap to add images', style: TextStyle(color: Colors.grey)),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+                          ),
+                          child: const Icon(Icons.add_photo_alternate_rounded, size: 32, color: Color(0xFF7C3AED)),
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Tap to select images', style: GoogleFonts.outfit(color: const Color(0xFF7C3AED), fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -429,222 +453,149 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   ],
                 ),
 
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
-
-              // Basic Information
-              const Text(
-                'Basic Information',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              // Car Name
-              CustomTextField(
-                controller: _carNameController,
-                label: 'Car Title',
-                hint: 'e.g., Toyota Corolla GLi 2020',
-                prefixIcon: Icons.title,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter car title';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Brand
-              CustomTextField(
-                controller: _brandController,
-                label: 'Brand',
-                hint: 'e.g., Toyota, Honda, Suzuki',
-                prefixIcon: Icons.branding_watermark,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter brand';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Model
-              CustomTextField(
-                controller: _modelController,
-                label: 'Model / Variant',
-                hint: 'e.g., Corolla, Civic, Alto',
-                prefixIcon: Icons.style,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter model';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Year
-              CustomTextField(
-                controller: _yearController,
-                label: 'Year',
-                hint: 'e.g., 2020',
-                prefixIcon: Icons.calendar_today,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(4),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter year';
-                  }
-                  final year = int.tryParse(value);
-                  if (year == null || year < 1990 || year > DateTime.now().year + 1) {
-                    return 'Please enter valid year';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Mileage
-              CustomTextField(
-                controller: _mileageController,
-                label: 'Mileage (KM)',
-                hint: 'e.g., 45000',
-                prefixIcon: Icons.speed,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter mileage';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
-
-              // Specifications
-              const Text(
-                'Specifications',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-
-              // Engine Size
-              CustomTextField(
-                controller: _engineSizeController,
-                label: 'Engine Size (CC)',
-                hint: 'e.g., 660, 1000, 1800',
-                prefixIcon: Icons.settings,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(5),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter engine size';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Fuel Type Dropdown
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Fuel Type',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _fuelType,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.local_gas_station),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+              ],
+            ),
+            
+            // Basic Information
+            _buildSection(
+              title: 'Basic Information',
+              children: [
+                CustomTextField(
+                  controller: _carNameController,
+                  label: 'Car Title',
+                  hint: 'e.g., Toyota Corolla GLi 2020',
+                  prefixIcon: Icons.title_rounded,
+                  validator: (value) => value == null || value.isEmpty ? 'Please enter car title' : null,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _brandController,
+                        label: 'Brand',
+                        hint: 'e.g., Toyota',
+                        prefixIcon: Icons.branding_watermark_rounded,
+                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                     ),
-                    items: _fuelTypes.map((fuel) {
-                      return DropdownMenuItem(
-                        value: fuel,
-                        child: Text(fuel),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _fuelType = value!;
-                      });
-                    },
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Transmission Dropdown
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Transmission',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _transmission,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.settings_input_component),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _modelController,
+                        label: 'Model',
+                        hint: 'e.g., Corolla',
+                        prefixIcon: Icons.style_rounded,
+                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                     ),
-                    items: _transmissions.map((trans) {
-                      return DropdownMenuItem(
-                        value: trans,
-                        child: Text(trans),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _transmission = value!;
-                      });
-                    },
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _yearController,
+                        label: 'Year',
+                        hint: 'e.g., 2020',
+                        prefixIcon: Icons.calendar_today_rounded,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          int? year = int.tryParse(value);
+                          if (year == null || year < 1990 || year > DateTime.now().year + 1) {
+                            return 'Invalid';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _mileageController,
+                        label: 'Mileage (KM)',
+                        hint: 'e.g., 45000',
+                        prefixIcon: Icons.speed_rounded,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
 
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
+            // Specifications
+            _buildSection(
+              title: 'Specifications',
+              children: [
+                CustomTextField(
+                  controller: _engineSizeController,
+                  label: 'Engine Size (CC)',
+                  hint: 'e.g., 660, 1000, 1800',
+                  prefixIcon: Icons.settings_rounded,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(5),
+                  ],
+                  validator: (value) => value == null || value.isEmpty ? 'Please enter engine size' : null,
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Fuel Type', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _fuelType,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.local_gas_station_rounded, color: Color(0xFF7C3AED)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      items: _fuelTypes.map((fuel) => DropdownMenuItem(value: fuel, child: Text(fuel))).toList(),
+                      onChanged: (value) => setState(() => _fuelType = value!),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Transmission', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _transmission,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.settings_input_component_rounded, color: Color(0xFF7C3AED)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      items: _transmissions.map((trans) => DropdownMenuItem(value: trans, child: Text(trans))).toList(),
+                      onChanged: (value) => setState(() => _transmission = value!),
+                    ),
+                  ],
+                ),
 
-              // Pricing
-              const Text(
-                'Pricing & Services',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
+              ],
+            ),
+
+            // Pricing & Services
+            _buildSection(
+              title: 'Pricing & Services',
+              children: [
 
               // Price per Day
               CustomTextField(
@@ -731,26 +682,26 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _hasInsurance ? Colors.green : Colors.grey.shade300,
+                            color: _hasInsurance ? const Color(0xFF7C3AED) : Colors.grey.shade200,
                             width: _hasInsurance ? 2 : 1,
                           ),
-                          color: _hasInsurance ? Colors.green.shade50 : Colors.white,
+                          color: _hasInsurance ? const Color(0xFF7C3AED).withValues(alpha: 0.05) : Colors.white,
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.shield_outlined,
-                                color: _hasInsurance ? Colors.green : Colors.grey,
-                                size: 28),
-                            const SizedBox(height: 6),
+                            Icon(Icons.verified_user_rounded,
+                                color: _hasInsurance ? const Color(0xFF7C3AED) : Colors.grey.shade400,
+                                size: 32),
+                            const SizedBox(height: 8),
                             Text(
                               'Yes — Car is insured',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: _hasInsurance ? Colors.green.shade800 : Colors.grey.shade700,
+                                color: _hasInsurance ? const Color(0xFF7C3AED) : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -769,26 +720,26 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: !_hasInsurance ? Colors.orange : Colors.grey.shade300,
+                            color: !_hasInsurance ? Colors.orange : Colors.grey.shade200,
                             width: !_hasInsurance ? 2 : 1,
                           ),
                           color: !_hasInsurance ? Colors.orange.shade50 : Colors.white,
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: !_hasInsurance ? Colors.orange : Colors.grey,
-                                size: 28),
-                            const SizedBox(height: 6),
+                            Icon(Icons.gpp_maybe_rounded,
+                                color: !_hasInsurance ? Colors.orange : Colors.grey.shade400,
+                                size: 32),
+                            const SizedBox(height: 8),
                             Text(
-                              'No — Car is not insured',
+                              'No — Uninsured',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: !_hasInsurance ? Colors.orange.shade800 : Colors.grey.shade700,
+                                color: !_hasInsurance ? Colors.orange.shade800 : Colors.grey.shade600,
                               ),
                             ),
                           ],
@@ -823,16 +774,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   ),
                 ),
 
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
+              ],
+            ),
 
-              // Description
-              const Text(
-                'Description',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
+            // Description
+            _buildSection(
+              title: 'Description',
+              children: [
 
               TextFormField(
                 controller: _descriptionController,
@@ -854,81 +802,88 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 },
               ),
 
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
+              ],
+            ),
 
-              // Location Picker
-              const Text(
-                'Location',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pin exactly where this car is available for pickup',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () async {
-                  final LocationPickerResult? result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LocationPickerScreen(),
+            // Location Picker
+            _buildSection(
+              title: 'Location',
+              subtitle: 'Pin exactly where this car is available for pickup',
+              children: [
+                InkWell(
+                  onTap: () async {
+                    final LocationPickerResult? result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LocationPickerScreen(),
+                      ),
+                    );
+                    if (result != null) {
+                      setState(() {
+                        _locationResult = result;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: _locationResult == null ? Colors.red.shade300 : const Color(0xFF16A34A)),
+                      borderRadius: BorderRadius.circular(12),
+                      color: _locationResult == null ? Colors.red.shade50 : const Color(0xFF16A34A).withValues(alpha: 0.05),
                     ),
-                  );
-                  if (result != null) {
-                    setState(() {
-                      _locationResult = result;
-                    });
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: _locationResult == null ? Colors.red.shade300 : Colors.green.shade500),
-                    borderRadius: BorderRadius.circular(8),
-                    color: _locationResult == null ? Colors.red.shade50 : Colors.green.shade50,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _locationResult == null ? Icons.location_off : Icons.location_on,
-                        color: _locationResult == null ? Colors.red : Colors.green,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _locationResult == null
-                            ? 'Tap to pick car location (Required)'
-                            : _locationResult!.locationLabel,
-                          style: TextStyle(
-                            color: _locationResult == null ? Colors.red.shade700 : Colors.green.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _locationResult == null ? Icons.location_off_rounded : Icons.location_on_rounded,
+                          color: _locationResult == null ? Colors.red : const Color(0xFF16A34A),
                         ),
-                      ),
-                      Icon(Icons.chevron_right, color: _locationResult == null ? Colors.red : Colors.green),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _locationResult == null
+                              ? 'Tap to pick car location (Required)'
+                              : _locationResult!.locationLabel,
+                            style: GoogleFonts.outfit(
+                              color: _locationResult == null ? Colors.red.shade700 : const Color(0xFF16A34A),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: _locationResult == null ? Colors.red : const Color(0xFF16A34A)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Submit Button
-              CustomButton(
-                text: 'Create Listing',
-                onPressed: _isSubmitting ? () {} : _submitListing,
-                isLoading: _isSubmitting,
-                icon: Icons.check,
-              ),
-
-              const SizedBox(height: 16),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSection({required String title, String? subtitle, required List<Widget> children}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+          ],
+          const SizedBox(height: 20),
+          ...children,
+        ],
       ),
     );
   }

@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -46,7 +48,7 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
         return Scaffold(
           backgroundColor: const Color(0xFFF7F8FC),
           appBar: AppBar(
-            title: Text('Host Bookings', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            title: Text('Host Inbox', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22)),
             automaticallyImplyLeading: false,
             backgroundColor: Colors.white,
             foregroundColor: Colors.black,
@@ -115,14 +117,24 @@ class _BookingList extends StatelessWidget {
       return Center(child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(isHost ? Icons.inbox_rounded : Icons.car_rental_rounded,
-              size: 72, color: Colors.grey.shade300),
-          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(isHost ? Icons.inbox_rounded : Icons.car_rental_rounded,
+                size: 64, color: const Color(0xFF7C3AED)),
+          ),
+          const SizedBox(height: 24),
           Text(emptyMsg.$1,
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+              style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87)),
           const SizedBox(height: 8),
-          Text(emptyMsg.$2,
-              style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(emptyMsg.$2,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14), textAlign: TextAlign.center),
+          ),
         ],
       ));
     }
@@ -158,28 +170,91 @@ class _HostBookingCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 3))],
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 8))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status ribbon
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.08),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            // Car Image Header with Glassmorphism Status Ribbon
+            SizedBox(
+              height: 160,
+              width: double.infinity,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: b.carPhoto.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: b.carPhoto,
+                            width: double.infinity,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                            errorWidget: (context, url, error) => Container(color: Colors.grey.shade200),
+                          )
+                        : Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(child: Icon(Icons.directions_car_rounded, size: 48, color: Colors.grey)),
+                          ),
+                  ),
+                  // Gradient Overlay
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.4),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.5],
+                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                    ),
+                  ),
+                  // Glassmorphism Status Ribbon
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.circle, size: 10, color: Colors.white),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(getStatusLabel(b.status),
+                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
+                              Text(fmt.format(b.startDate),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Row(children: [
-                Icon(Icons.circle, size: 10, color: color),
-                const SizedBox(width: 8),
-                Text(getStatusLabel(b.status),
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                Text(fmt.format(b.startDate),
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-              ]),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -208,18 +283,21 @@ class _HostBookingCard extends StatelessWidget {
                     )),
                     // Income badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.green.shade200),
+                        gradient: LinearGradient(
+                          colors: [const Color(0xFF16A34A).withValues(alpha: 0.15), const Color(0xFF16A34A).withValues(alpha: 0.05)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         'PKR ${b.totalRent.toStringAsFixed(0)}',
-                        style: TextStyle(
-                            color: Colors.green.shade700,
+                        style: GoogleFonts.outfit(
+                            color: const Color(0xFF16A34A),
                             fontWeight: FontWeight.bold,
-                            fontSize: 13),
+                            fontSize: 14),
                       ),
                     ),
                   ]),
@@ -276,18 +354,28 @@ class _HostBookingCard extends StatelessWidget {
 
     if (label == null) return const SizedBox.shrink();
 
-    return SizedBox(
+    return Container(
       width: double.infinity,
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: (color ?? Colors.grey).withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14)),
       ),
     );
   }

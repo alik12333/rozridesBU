@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase-client';
 import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CheckCircle, XCircle, Handshake, ArrowLeft } from 'lucide-react';
 
 interface ClaimData {
@@ -56,21 +57,28 @@ export default function ClaimReviewPage() {
 
     const [adminNotes, setAdminNotes] = useState('');
     const [customSplit, setCustomSplit] = useState('');
+    const [extraAmount, setExtraAmount] = useState('');
     const [processing, setProcessing] = useState<string | null>(null);
+
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        type: 'host' | 'renter' | 'split' | 'extra' | 'force-close' | null;
+        message: string;
+        finalAmount: number;
+        extraCharge: number;
+    }>({ isOpen: false, type: null, message: '', finalAmount: 0, extraCharge: 0 });
 
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!claimId) return;
-        fetchData();
-    }, [claimId]);
 
-    const fetchData = async () => {
-        try {
-            const claimRef = doc(db, 'damageClaims', claimId);
-            const claimSnap = await getDoc(claimRef);
-            if (!claimSnap.exists()) return;
-
+        const claimRef = doc(db, 'damageClaims', claimId);
+        const unsub = onSnapshot(claimRef, async (claimSnap) => {
+            if (!claimSnap.exists()) {
+                setLoading(false);
+                return;
+            }
             const claimData = { claimId, ...claimSnap.data() } as ClaimData;
 
             // Fetch booking to get deposit amount
@@ -87,64 +95,90 @@ export default function ClaimReviewPage() {
                 setClaim({ ...claimData });
             }
 
-            // Fetch inspections
-            const preSnap = await getDoc(doc(db, 'bookings', claimData.bookingId, 'inspections', 'pre_trip'));
-            if (preSnap.exists()) setPreTrip(preSnap.data() as Inspection);
+            // Fetch inspections (only once)
+            if (!preTrip) {
+                const preSnap = await getDoc(doc(db, 'bookings', claimData.bookingId, 'inspections', 'pre_trip'));
+                if (preSnap.exists()) setPreTrip(preSnap.data() as Inspection);
+            }
+            if (!postTrip) {
+                const postSnap = await getDoc(doc(db, 'bookings', claimData.bookingId, 'inspections', 'post_trip'));
+                if (postSnap.exists()) setPostTrip(postSnap.data() as Inspection);
+            }
 
-            const postSnap = await getDoc(doc(db, 'bookings', claimData.bookingId, 'inspections', 'post_trip'));
-            if (postSnap.exists()) setPostTrip(postSnap.data() as Inspection);
+            // Fetch chat (only once)
+            if (messages.length === 0) {
+                const convId = `${claimData.carId}_${claimData.renterId}`;
+                const msgQ = query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc'));
+                const msgSnap = await getDocs(msgQ);
+                const msgs = msgSnap.docs.map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                    createdAt: d.data().createdAt?.toDate() || new Date()
+                })) as ChatMessage[];
+                setMessages(msgs);
+                setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 500);
+            }
 
-            // Fetch chat
-            const convId = `${claimData.carId}_${claimData.renterId}`;
-            const msgQ = query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc'));
-            const msgSnap = await getDocs(msgQ);
-            
-            const msgs = msgSnap.docs.map(d => ({
-                id: d.id,
-                ...d.data(),
-                createdAt: d.data().createdAt?.toDate() || new Date()
-            })) as ChatMessage[];
-            setMessages(msgs);
-
-            setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 500);
-
-        } catch (e) {
-            console.error(e);
-        } finally {
             setLoading(false);
-        }
-    };
+        });
 
-    const handleResolve = async (decision: 'host' | 'renter' | 'split') => {
+        return () => unsub();
+    }, [claimId]);
+
+    const handleResolveClick = (decision: 'host' | 'renter' | 'split' | 'extra') => {
         if (!claim) return;
 
         let finalAmount = 0;
+        let extraCharge = 0;
+        let message = '';
+        
         if (decision === 'host') {
             finalAmount = claim.hostClaimedAmount;
-            if (!confirm(`Confirm: Host keeps PKR ${finalAmount}. This decision is final and will notify both parties.`)) return;
+            message = `Confirm: Host keeps PKR ${finalAmount}. This will notify both parties.`;
         } else if (decision === 'renter') {
             finalAmount = 0;
-            if (!confirm(`Confirm: Full deposit returned to renter. This decision is final.`)) return;
+            message = `Confirm: Full deposit returned to renter.`;
         } else if (decision === 'split') {
             finalAmount = parseFloat(customSplit);
             if (isNaN(finalAmount) || finalAmount < 0 || finalAmount > (claim.depositAmount || 0)) {
                 alert(`Invalid split amount. Must be between 0 and ${claim.depositAmount}`);
                 return;
             }
-            if (!confirm(`Confirm: Host keeps PKR ${finalAmount}. This is a custom split decision.`)) return;
+            message = `Confirm: Host keeps PKR ${finalAmount}. This is a custom split decision.`;
+        } else if (decision === 'extra') {
+            extraCharge = parseFloat(extraAmount);
+            if (isNaN(extraCharge) || extraCharge <= 0) {
+                alert(`Invalid extra amount. Must be a positive number greater than 0.`);
+                return;
+            }
+            finalAmount = claim.depositAmount || 0;
+            message = `Confirm: Host keeps full deposit AND renter pays extra PKR ${extraCharge}.`;
         }
 
-        setProcessing(decision);
+        setConfirmModal({
+            isOpen: true,
+            type: decision,
+            message,
+            finalAmount,
+            extraCharge
+        });
+    };
+
+    const executeResolve = async () => {
+        if (!claim || !confirmModal.type || confirmModal.type === 'force-close') return;
+
+        setProcessing(confirmModal.type);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        
         try {
             const res = await fetch(`/api/claims/${claim.claimId}/resolve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     bookingId: claim.bookingId,
-                    resolvedInFavorOf: decision,
-                    finalDeductionAmount: finalAmount,
+                    resolvedInFavorOf: confirmModal.type,
+                    finalDeductionAmount: confirmModal.finalAmount,
+                    extraChargeAmount: confirmModal.extraCharge,
                     adminNotes,
                     hostId: claim.hostId,
                     renterId: claim.renterId,
@@ -153,14 +187,47 @@ export default function ClaimReviewPage() {
             });
 
             if (res.ok) {
-                setClaim({ ...claim, status: 'resolved', resolvedInFavorOf: decision, finalDeductionAmount: finalAmount });
-                alert('Claim resolved successfully.');
+                alert('Claim decision posted. Awaiting confirmation from parties.');
             } else {
                 alert('Failed to resolve claim.');
             }
         } catch (e) {
             console.error(e);
             alert('Error resolving claim');
+        } finally {
+            setProcessing(null);
+        }
+    };
+
+    const handleForceCloseClick = () => {
+        if (!claim) return;
+        setConfirmModal({
+            isOpen: true,
+            type: 'force-close',
+            message: 'Are you sure you want to FORCE CLOSE this trip? This bypasses the cash settlement confirmation.',
+            finalAmount: 0,
+            extraCharge: 0
+        });
+    };
+
+    const executeForceClose = async () => {
+        if (!claim) return;
+        
+        setProcessing('force-close');
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        
+        try {
+            const res = await fetch(`/api/claims/${claim.claimId}/force-close`, {
+                method: 'POST',
+            });
+            if (res.ok) {
+                alert('Trip force closed successfully.');
+            } else {
+                alert('Failed to force close trip.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error force closing trip');
         } finally {
             setProcessing(null);
         }
@@ -202,10 +269,20 @@ export default function ClaimReviewPage() {
                 <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/claims')}>
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <div>
+                <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-bold">Review Claim #{claim.claimId.slice(0,8)}</h1>
                     <p className="text-muted-foreground text-sm">Booking ID: {claim.bookingId}</p>
                 </div>
+                {claim.status === 'decided' && (
+                    <div className="ml-auto flex items-center gap-4 bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg">
+                        <span className="text-blue-800 font-bold text-sm uppercase">
+                            DECISION POSTED
+                        </span>
+                        <Button variant="destructive" size="sm" onClick={handleForceCloseClick} disabled={!!processing}>
+                            FORCE CLOSE TRIP
+                        </Button>
+                    </div>
+                )}
                 {isResolved && (
                     <span className="ml-auto bg-green-100 text-green-800 font-bold px-3 py-1 rounded-full text-sm">
                         RESOLVED ({claim.resolvedInFavorOf?.toUpperCase()})
@@ -266,9 +343,19 @@ export default function ClaimReviewPage() {
                 {isResolved ? (
                     <div className="bg-green-50 border border-green-200 rounded p-4 text-green-800">
                         <p className="font-bold mb-1">Decision Finalized</p>
-                        <p className="text-sm">Resolved in favor of: <strong>{claim.resolvedInFavorOf?.toUpperCase()}</strong></p>
-                        <p className="text-sm">Final Deduction: <strong>PKR {claim.finalDeductionAmount?.toLocaleString()}</strong></p>
-                        {claim.adminNotes && <p className="text-sm mt-2 pt-2 border-t border-green-200">Notes: {claim.adminNotes}</p>}
+                        <p className="text-sm">Admin ruled: <strong>{claim.resolvedInFavorOf?.toUpperCase()}</strong></p>
+                        <p className="text-sm mt-2">Awaiting cash confirmation from both parties in the mobile app.</p>
+                    </div>
+                ) : claim.status === 'decided' ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded p-4 text-blue-800 flex justify-between items-center">
+                        <div>
+                            <p className="font-bold mb-1">Decision Posted</p>
+                            <p className="text-sm">Admin ruled: <strong>{claim.resolvedInFavorOf?.toUpperCase()}</strong></p>
+                            <p className="text-sm mt-2">Awaiting cash confirmation from both parties in the mobile app.</p>
+                        </div>
+                        <Button variant="destructive" size="sm" onClick={handleForceCloseClick} disabled={!!processing}>
+                            FORCE CLOSE TRIP
+                        </Button>
                     </div>
                 ) : (
                     <div className="flex gap-6">
@@ -283,30 +370,70 @@ export default function ClaimReviewPage() {
                         </div>
                         <div className="flex-1 flex flex-col justify-end gap-3">
                             <div className="flex gap-3">
-                                <Button className="flex-1 bg-teal-600 hover:bg-teal-700 h-12" onClick={() => handleResolve('renter')} disabled={!!processing}>
-                                    <XCircle className="w-5 h-5 mr-2"/> SIDE WITH RENTER (Return Full Deposit)
+                                <Button className="flex-1 bg-teal-600 hover:bg-teal-700 h-10" onClick={() => handleResolveClick('renter')} disabled={!!processing}>
+                                    <XCircle className="w-4 h-4 mr-2"/> SIDE WITH RENTER
                                 </Button>
-                                <Button className="flex-1 bg-red-600 hover:bg-red-700 h-12" onClick={() => handleResolve('host')} disabled={!!processing}>
-                                    <CheckCircle className="w-5 h-5 mr-2"/> SIDE WITH HOST (Keep PKR {claim.hostClaimedAmount})
+                                <Button className="flex-1 bg-red-600 hover:bg-red-700 h-10" onClick={() => handleResolveClick('host')} disabled={!!processing}>
+                                    <CheckCircle className="w-4 h-4 mr-2"/> SIDE WITH HOST
                                 </Button>
                             </div>
-                            <div className="flex gap-2 items-center bg-purple-50 p-2 rounded border border-purple-200">
-                                <span className="text-sm font-bold text-purple-900 whitespace-nowrap px-2">SPLIT:</span>
+                            <div className="flex gap-2 items-center bg-purple-50 p-1.5 rounded border border-purple-200">
+                                <span className="text-[10px] font-bold text-purple-900 uppercase px-1">Split</span>
                                 <input 
                                     type="number" 
-                                    className="border rounded px-3 py-2 w-32 text-sm" 
-                                    placeholder="Amount..."
+                                    className="border rounded px-2 py-1 w-24 text-sm" 
+                                    placeholder="Amount"
                                     value={customSplit}
                                     onChange={e => setCustomSplit(e.target.value)}
                                 />
-                                <Button className="flex-1 bg-purple-600 hover:bg-purple-700" onClick={() => handleResolve('split')} disabled={!!processing}>
-                                    <Handshake className="w-4 h-4 mr-2"/> APPLY SPLIT
+                                <Button className="flex-1 bg-purple-600 hover:bg-purple-700 h-8 text-xs" onClick={() => handleResolveClick('split')} disabled={!!processing}>
+                                    <Handshake className="w-3 h-3 mr-1"/> APPLY SPLIT
+                                </Button>
+                            </div>
+                            <div className="flex gap-2 items-center bg-orange-50 p-1.5 rounded border border-orange-200">
+                                <span className="text-[10px] font-bold text-orange-900 uppercase px-1">Extra</span>
+                                <input 
+                                    type="number" 
+                                    className="border rounded px-2 py-1 w-24 text-sm" 
+                                    placeholder="Amount"
+                                    value={extraAmount}
+                                    onChange={e => setExtraAmount(e.target.value)}
+                                />
+                                <Button className="flex-1 bg-orange-600 hover:bg-orange-700 h-8 text-xs" onClick={() => handleResolveClick('extra')} disabled={!!processing}>
+                                    APPLY EXTRA CHARGE
                                 </Button>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
+
+            {/* Custom Confirmation Dialog */}
+            <Dialog open={confirmModal.isOpen} onOpenChange={(isOpen) => setConfirmModal(prev => ({ ...prev, isOpen }))}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Action</DialogTitle>
+                        <DialogDescription className="pt-4 pb-2 text-base text-gray-800 font-medium">
+                            {confirmModal.message}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-6">
+                        <Button variant="outline" onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant={confirmModal.type === 'force-close' ? 'destructive' : 'default'}
+                            onClick={() => {
+                                if (confirmModal.type === 'force-close') executeForceClose();
+                                else executeResolve();
+                            }}
+                            disabled={!!processing}
+                        >
+                            {processing ? 'Processing...' : 'Yes, Confirm'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

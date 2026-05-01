@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -58,13 +59,29 @@ class CustomTextField extends StatelessWidget {
           onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+            hintStyle: GoogleFonts.outfit(color: Colors.grey.shade400),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: const Color(0xFF7C3AED).withValues(alpha: 0.7)) : null,
             prefixText: prefixText,
+            prefixStyle: GoogleFonts.outfit(color: const Color(0xFF7C3AED), fontWeight: FontWeight.bold),
             suffixIcon: suffixIcon,
             counterText: '',
+            filled: true,
+            fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 12,
+              vertical: 16,
             ),
           ),
         ),
