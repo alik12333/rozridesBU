@@ -56,4 +56,4 @@ app.*.map.json
 # -----------------------------------------
 
 migrate_working_dir/
-functions/
+functions/graphify-out/
