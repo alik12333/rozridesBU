@@ -10,6 +10,7 @@ Color getStatusColor(String status) {
     case 'rejected': return Colors.red;
     case 'expired': return Colors.red;
     case 'flagged': return Colors.purple;
+    case 'decided': return Colors.amber.shade700;
     default: return Colors.grey;
   }
 }
@@ -24,6 +25,7 @@ String getStatusLabel(String status) {
     case 'rejected': return '✗ Declined by Host';
     case 'expired': return '✗ Request Expired';
     case 'flagged': return '⚠ Under Review';
+    case 'decided': return '⚖ Admin Decision Posted';
     default: return 'Unknown';
   }
 }
@@ -46,6 +48,8 @@ String getStatusDescription(String status) {
       return 'Host did not respond in time';
     case 'flagged':
       return 'RozRides is reviewing this trip. You will be notified of the outcome.';
+    case 'decided':
+      return 'Admin has posted a decision. Open the booking to confirm your settlement.';
     default:
       return '';
   }

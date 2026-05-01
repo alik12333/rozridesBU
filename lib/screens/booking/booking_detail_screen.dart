@@ -30,7 +30,7 @@ class BookingDetailScreen extends StatefulWidget {
 class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final BookingService _service = BookingService();
   late final Stream<BookingModel?> _bookingStream;
-  late final Stream<DamageClaim?> _claimStream;
+  Stream<DamageClaim?>? _claimStream;
   Map<String, dynamic>? _otherPartyData;
   Timer? _timer;
   bool _isConfirming = false;
@@ -39,7 +39,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   void initState() {
     super.initState();
     _bookingStream = _service.streamBooking(widget.bookingId);
-    _claimStream = _service.streamClaimForBooking(widget.bookingId);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -111,36 +110,43 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         final otherPartyId = isHost ? booking.renterId : booking.hostId;
         _loadOtherParty(otherPartyId);
 
-        final remaining = booking.expiresAt.difference(DateTime.now());
-        final statusColor = getStatusColor(booking.status);
-        final cnicStatus = _otherPartyData?['cnic']?['verificationStatus'] ?? 'pending';
+        final userId = currentUser?.id ?? '';
+        _claimStream ??= _service.streamClaimForBooking(widget.bookingId, userId, isHost);
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF7F8FC),
-          appBar: AppBar(
-            title: Text('Booking #${booking.id.substring(0, 8).toUpperCase()}',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            elevation: 0,
-            surfaceTintColor: Colors.white,
-          ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Status Banner ────────────────────────────────────────
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  color: statusColor.withValues(alpha: 0.1),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(getStatusLabel(booking.status),
-                          style: GoogleFonts.outfit(
-                              color: statusColor,
+        return StreamBuilder<DamageClaim?>(
+          stream: _claimStream,
+          builder: (context, claimSnap) {
+            final claim = claimSnap.data;
+            final remaining = booking.expiresAt.difference(DateTime.now());
+            final statusColor = getStatusColor(booking.status);
+            final cnicStatus = _otherPartyData?['cnic']?['verificationStatus'] ?? 'pending';
+
+            return Scaffold(
+              backgroundColor: const Color(0xFFF7F8FC),
+              appBar: AppBar(
+                title: Text('Booking #${booking.id.substring(0, 8).toUpperCase()}',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                surfaceTintColor: Colors.white,
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Status Banner ────────────────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: statusColor.withValues(alpha: 0.1),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(getStatusLabel(booking.status),
+                              style: GoogleFonts.outfit(
+                                  color: statusColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 16)),
                       const SizedBox(height: 4),
@@ -255,13 +261,20 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
                   ],
                 )),
+                
+                const SizedBox(height: 24),
+                if (_buildActions(context, booking, isHost, claim) != null) ...[
+                  _buildActions(context, booking, isHost, claim)!,
+                  const SizedBox(height: 12),
+                ],
               ],
             ),
           ),
-          bottomNavigationBar: _buildActions(context, booking, isHost),
         );
       },
     );
+  },
+);
   }
 
   Widget _cashScheduleCard(BookingModel booking) {
@@ -381,29 +394,22 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost) {
+  Widget? _buildActions(BuildContext context, BookingModel booking, bool isHost, DamageClaim? claim) {
     if (booking.status == 'flagged') {
-      return StreamBuilder<DamageClaim?>(
-        stream: _claimStream,
-        builder: (context, claimSnap) {
-          final claim = claimSnap.data;
+      // Under review — no decision yet
+      if (claim == null ||
+          claim.status == 'open' ||
+          claim.status == 'admin_reviewing') {
+        return _flaggedUnderReviewBar();
+      }
 
-          // Under review — no decision yet
-          if (claim == null ||
-              claim.status == 'open' ||
-              claim.status == 'admin_reviewing') {
-            return _flaggedUnderReviewBar();
-          }
+      // Decision posted — show card + confirmation button
+      if (claim.status == 'decided') {
+        return _flaggedDecidedBar(context, booking, claim, isHost);
+      }
 
-          // Decision posted — show card + confirmation button
-          if (claim.status == 'decided') {
-            return _flaggedDecidedBar(context, booking, claim, isHost);
-          }
-
-          // Already resolved — no action needed
-          return const SizedBox.shrink();
-        },
-      );
+      // Already resolved — no action needed
+      return const SizedBox.shrink();
     }
 
     final List<Widget> buttons = [];

@@ -127,12 +127,13 @@ service cloud.firestore {
 
     match /damageClaims/{claimId} {
       allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && (
-        resource.data.hostId == request.auth.uid ||
-        resource.data.renterId == request.auth.uid ||
-        isAdmin()
+      allow read: if isAuthenticated();
+      allow update: if isAdmin() || (
+        isAuthenticated() && (
+          (resource.data.hostId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hostConfirmed', 'hostConfirmedAt', 'status', 'resolvedAt'])) ||
+          (resource.data.renterId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['renterConfirmed', 'renterConfirmedAt', 'status', 'resolvedAt']))
+        )
       );
-      allow update: if isAdmin();
       allow delete: if false;
     }
 

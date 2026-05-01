@@ -1348,16 +1348,36 @@ class BookingService {
   // ──────────────── STREAM CLAIM FOR BOOKING (Dispute 2.0) ────────────────
 
   /// Returns a real-time stream of the damage claim associated with [bookingId].
-  Stream<DamageClaim?> streamClaimForBooking(String bookingId) {
+  Stream<DamageClaim?> streamClaimForBooking(String bookingId, String userId, bool isHost) {
     return _firestore
         .collection('damageClaims')
         .where('bookingId', isEqualTo: bookingId)
-        .limit(1)
+        .where(isHost ? 'hostId' : 'renterId', isEqualTo: userId)
         .snapshots()
         .map((snap) {
           if (snap.docs.isEmpty) return null;
-          final doc = snap.docs.first;
-          return DamageClaim.fromMap(doc.data(), doc.id);
+          final claims = snap.docs
+              .map((doc) => DamageClaim.fromMap(doc.data(), doc.id))
+              .toList();
+          
+          // Priority weights for statuses so we don't accidentally show an old 'open' claim 
+          // if a newer one was decided or vice-versa.
+          const statusWeight = {
+            'resolved': 4,
+            'decided': 3,
+            'admin_reviewing': 2,
+            'open': 1,
+          };
+          
+          claims.sort((a, b) {
+            final weightA = statusWeight[a.status] ?? 0;
+            final weightB = statusWeight[b.status] ?? 0;
+            if (weightA != weightB) return weightB.compareTo(weightA);
+            // If same status, fallback to newest first
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          
+          return claims.first;
         });
   }
 
