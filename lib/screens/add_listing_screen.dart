@@ -277,7 +277,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF7C3AED).withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2), style: BorderStyle.solid),
+                              border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
                             ),
                             child: const Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -329,7 +329,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 CustomTextField(
                   controller: _carNameController,
                   label: 'Car Title',
-                  hint: 'e.g., Toyota Corolla GLi 2020',
+                  hint: 'Toyota Corolla 2022',
                   prefixIcon: Icons.title_rounded,
                   maxLength: 60,
                   validator: (value) {
@@ -342,7 +342,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 CustomTextField(
                   controller: _carNumberController,
                   label: 'Car Number (Private)',
-                  hint: 'e.g., LEC-1234',
+                  hint: 'ABC-1234',
                   prefixIcon: Icons.numbers_rounded,
                   maxLength: 15,
                   validator: (value) => value == null || value.isEmpty ? 'Car number is required for admin' : null,
@@ -354,7 +354,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       child: CustomTextField(
                         controller: _brandController,
                         label: 'Brand',
-                        hint: 'e.g., Toyota',
+                        hint: 'Toyota',
                         prefixIcon: Icons.branding_watermark_rounded,
                         maxLength: 30,
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -365,7 +365,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       child: CustomTextField(
                         controller: _modelController,
                         label: 'Model',
-                        hint: 'e.g., Corolla',
+                        hint: 'Corolla',
                         prefixIcon: Icons.style_rounded,
                         maxLength: 30,
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -380,7 +380,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       child: CustomTextField(
                         controller: _yearController,
                         label: 'Year',
-                        hint: 'e.g., 2020',
+                        hint: 'YYYY',
                         prefixIcon: Icons.calendar_today_rounded,
                         keyboardType: TextInputType.number,
                         maxLength: 4,
@@ -403,7 +403,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       child: CustomTextField(
                         controller: _mileageController,
                         label: 'Mileage (KM)',
-                        hint: 'e.g., 45000',
+                        hint: 'Total KM',
                         prefixIcon: Icons.speed_rounded,
                         keyboardType: TextInputType.number,
                         maxLength: 7,
@@ -473,7 +473,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 CustomTextField(
                   controller: _engineSizeController,
                   label: 'Engine Size',
-                  hint: 'e.g., 1300cc',
+                  hint: '1300cc',
                   prefixIcon: Icons.settings_input_component_rounded,
                   maxLength: 10,
                   validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -490,7 +490,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 CustomTextField(
                   controller: _priceController,
                   label: 'Price per Day (PKR)',
-                  hint: 'e.g., 5000',
+                  hint: 'Amount',
                   prefixText: 'PKR ',
                   keyboardType: TextInputType.number,
                   maxLength: 8,

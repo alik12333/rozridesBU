@@ -401,7 +401,7 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                labelText: 'Deduction for damage (PKR)',
+                labelText: 'Amount',
                 prefixIcon: const Icon(Icons.money_off),
                 counterText: '',
                 border:

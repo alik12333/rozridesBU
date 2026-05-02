@@ -425,7 +425,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search area (e.g., DHA Phase 6)',
+                      hintText: 'Search area...',
                       hintStyle: TextStyle(color: Colors.grey.shade400),
                       border: InputBorder.none,
                     ),

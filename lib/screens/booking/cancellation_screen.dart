@@ -255,11 +255,13 @@ class _CancellationScreenState extends State<CancellationScreen> {
                 maxLines: 3,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Please describe your reason...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintText: 'Enter reason...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   filled: true,
                   fillColor: Colors.white,
                 ),
+
               ),
             ],
             const SizedBox(height: 20),

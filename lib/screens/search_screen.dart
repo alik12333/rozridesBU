@@ -164,7 +164,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search by car name, brand, or model...',
+              hintText: 'Search cars...',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(

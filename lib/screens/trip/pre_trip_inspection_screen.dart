@@ -366,7 +366,7 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
               onChanged: (v) => _updateItem(area, item.copyWith(notes: v)),
               maxLength: 200,
               decoration: InputDecoration(
-                hintText: 'Describe the damage...',
+                hintText: 'Enter details...',
                 counterText: '', // Hide counter
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 contentPadding: const EdgeInsets.all(12),

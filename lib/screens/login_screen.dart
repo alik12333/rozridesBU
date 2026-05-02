@@ -209,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   const SizedBox(height: 8),
                                   _DarkField(
                                     controller: _emailCtrl,
-                                    hint: 'you@example.com',
+                                    hint: 'example@mail.com',
                                     prefixIcon: Icons.email_outlined,
                                     keyboardType:
                                         TextInputType.emailAddress,
@@ -236,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   const SizedBox(height: 8),
                                   _DarkField(
                                     controller: _passCtrl,
-                                    hint: '••••••••',
+                                    hint: 'Enter password',
                                     prefixIcon: Icons.lock_outline_rounded,
                                     obscureText: _obscurePassword,
                                     maxLength: 64,

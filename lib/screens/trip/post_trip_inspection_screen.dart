@@ -337,7 +337,7 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
               onChanged: (v) => _updateItem(area, postItem.copyWith(notes: v)),
               maxLength: 200,
               decoration: InputDecoration(
-                hintText: 'Describe the new damage (required)...',
+                hintText: 'Enter details...',
                 counterText: '',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

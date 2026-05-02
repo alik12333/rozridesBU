@@ -492,7 +492,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
                   maxLines: 4,
                   decoration: InputDecoration(
                     hintText:
-                        'Introduce yourself or ask the host a question (optional)',
+                        'Write a message to the host...',
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12)),
                     counterText: '${val.text.length}/300',

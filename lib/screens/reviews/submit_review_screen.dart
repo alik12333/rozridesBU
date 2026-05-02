@@ -206,9 +206,7 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
               maxLength: 500,
               style: const TextStyle(fontSize: 15, height: 1.5),
               decoration: InputDecoration(
-                hintText: _isRenterReviewing
-                    ? 'How was the car\'s condition? Was the host helpful and punctual?'
-                    : 'How was the renter\'s behavior? Was the car returned clean and on time?',
+                hintText: 'Describe your experience...',
                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                 filled: true,
                 fillColor: Colors.white,

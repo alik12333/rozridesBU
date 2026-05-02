@@ -105,7 +105,7 @@ class _IncomingRequestsScreenState extends State<IncomingRequestsScreen> {
                         maxLines: 2,
                         onChanged: (_) => setSheetState(() {}),
                         decoration: InputDecoration(
-                          hintText: 'Please explain...',
+                          hintText: 'Enter reason...',
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12)),
                           contentPadding: const EdgeInsets.all(12),

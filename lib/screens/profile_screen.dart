@@ -385,6 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CustomTextField(
             controller: _nameController,
             label: 'Full Name',
+            hint: 'e.g. John Doe',
             prefixIcon: Icons.person_outline,
             maxLength: 50,
             validator: (v) {
@@ -397,6 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CustomTextField(
             controller: _emailController,
             label: 'Email Address',
+            hint: 'example@mail.com',
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             maxLength: 254,
@@ -405,6 +407,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           CustomTextField(
             controller: _phoneController,
             label: 'Phone Number',
+            hint: '300 1234567',
             prefixIcon: Icons.phone_outlined,
             keyboardType: TextInputType.phone,
             maxLength: 20,
@@ -421,6 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: CustomTextField(
                   controller: _cityController,
                   label: 'City',
+                  hint: 'e.g. Lahore',
                   prefixIcon: Icons.location_city_outlined,
                   maxLength: 30,
                 ),
@@ -430,6 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: CustomTextField(
                   controller: _areaController,
                   label: 'Area',
+                  hint: 'e.g. Gulberg',
                   prefixIcon: Icons.map_outlined,
                   maxLength: 30,
                 ),

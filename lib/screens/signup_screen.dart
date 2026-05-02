@@ -240,7 +240,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _nameController,
                           label: 'Full Name',
-                          hint: 'Enter your full name',
+                          hint: 'e.g. John Doe',
                           prefixIcon: Icons.person_outline,
                           maxLength: 50,
                           validator: (v) {
@@ -254,7 +254,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _emailController,
                           label: 'Email',
-                          hint: 'your.email@example.com',
+                          hint: 'example@mail.com',
                           prefixIcon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           maxLength: 254,
@@ -271,7 +271,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _phoneController,
                           label: 'Phone Number',
-                          hint: '3001234567',
+                          hint: '300 1234567',
                           prefixIcon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
                           maxLength: 20,
@@ -318,7 +318,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _passwordController,
                           label: 'Password',
-                          hint: 'Minimum 6 characters',
+                          hint: 'Create password',
                           prefixIcon: Icons.lock_outline,
                           obscureText: _obscurePassword,
                           maxLength: 64,
@@ -337,7 +337,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _confirmPasswordController,
                           label: 'Confirm Password',
-                          hint: 'Re-enter password',
+                          hint: 'Repeat password',
                           prefixIcon: Icons.lock_outline,
                           obscureText: _obscureConfirmPassword,
                           maxLength: 64,
@@ -360,7 +360,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         CustomTextField(
                           controller: _cnicNumberController,
                           label: 'CNIC Number',
-                          hint: 'Enter CNIC number',
+                          hint: '42201-1234567-1',
                           keyboardType: TextInputType.number,
                           maxLength: 13,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(13)],

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -45,7 +46,6 @@ class _ChatScreenState extends State<ChatScreen> {
           _isHost = widget.currentUserId == _conversation!.hostId;
         });
         
-        // Reset unread count for current user
         await _chatService.resetUnreadCount(
           conversationId: widget.conversationId,
           isHost: _isHost,
@@ -61,8 +61,6 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty || _conversation == null) return;
 
     _textCtrl.clear();
-    
-    // Optimistic UI scroll
     _scrollToBottom();
 
     try {
@@ -78,6 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
           SnackBar(
             content: Text('Failed to send message: $e'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -98,25 +97,22 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     if (_conversation == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
       );
     }
 
     final otherName = _conversation!.otherPartyNameFor(widget.currentUserId);
     final otherPhoto = _conversation!.otherPartyPhotoFor(widget.currentUserId);
-    // Only truly dead bookings lock the chat.
-    // 'completed' trips keep the chat open so renters can re-book.
-    final isReadOnly = _conversation!.bookingStatus == 'cancelled' ||
-                       _conversation!.bookingStatus == 'rejected';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 1,
-        shadowColor: Colors.black12,
+        elevation: 0,
+        surfaceTintColor: Colors.white,
         titleSpacing: 0,
+        leading: const BackButton(color: Colors.black),
         title: Row(
           children: [
             CircleAvatar(
@@ -128,8 +124,8 @@ class _ChatScreenState extends State<ChatScreen> {
               child: (otherPhoto == null || otherPhoto.isEmpty)
                   ? Text(
                       otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: Color(0xFF7C3AED),
+                      style: GoogleFonts.outfit(
+                        color: const Color(0xFF7C3AED),
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -145,17 +141,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     otherName,
                     style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      color: Colors.black87,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     _conversation!.carName,
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF7C3AED),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -165,146 +163,195 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded, color: Colors.grey),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          if (isReadOnly)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.red.shade50,
-              child: Text(
-                'This booking was cancelled or rejected. Chat is read-only.',
-                style: TextStyle(
-                  color: Colors.red.shade800,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          // Show a friendly banner when the trip is complete but chat is still open
-          if (_conversation?.bookingStatus == 'completed')
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.green.shade50,
-              child: Text(
-                '🎉 Trip completed! Feel free to book again.',
-                style: TextStyle(
-                  color: Colors.green.shade800,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          Expanded(
-            child: StreamBuilder<List<MessageModel>>(
-              stream: _chatService.getMessages(widget.conversationId),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error loading messages: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.red)),
-                  );
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                
-                final messages = snapshot.data ?? [];
-                
-                // Auto-scroll to bottom on new messages
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollCtrl.hasClients) {
-                    _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-                  }
-                });
-
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'Say hi to $otherName!',
-                      style: TextStyle(color: Colors.grey.shade500),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollCtrl,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    if (msg.isSystem) {
-                      return _SystemMessageBubble(message: msg);
+          Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<List<MessageModel>>(
+                  stream: _chatService.getMessages(widget.conversationId),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text('Error loading messages: ${snapshot.error}',
+                            style: const TextStyle(color: Colors.red)),
+                      );
                     }
-                    final isMe = msg.senderId == widget.currentUserId;
-                    return _ChatBubble(message: msg, isMe: isMe);
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)));
+                    }
+                    
+                    final messages = snapshot.data ?? [];
+                    
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_scrollCtrl.hasClients) {
+                        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+                      }
+                    });
+
+                    if (messages.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Start your conversation with $otherName',
+                              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(16, 80, 16, 100), // Extra top padding for floating status
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        if (msg.isSystem) {
+                          return _SystemMessageBubble(message: msg);
+                        }
+                        final isMe = msg.senderId == widget.currentUserId;
+                        return _ChatBubble(message: msg, isMe: isMe);
+                      },
+                    );
                   },
-                );
-              },
+                ),
+              ),
+              
+              // Input Area (Always active)
+              _buildInputArea(),
+            ],
+          ),
+
+          // Floating Status Pill
+          _buildFloatingStatus(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingStatus() {
+    final status = _conversation?.bookingStatus ?? 'pre-booking';
+    final bool isDead = status == 'cancelled' || status == 'rejected';
+    final bool isComplete = status == 'completed';
+    final Color color = isDead ? Colors.red : (isComplete ? Colors.green : const Color(0xFF7C3AED));
+
+    return Positioned(
+      top: 16,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: color.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _getStatusLabel(status),
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          
-          // Input Area
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              16, 
-              12, 
-              16, 
-              MediaQuery.of(context).padding.bottom + 12
+        ),
+      ),
+    );
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'pending': return 'WAITING FOR APPROVAL';
+      case 'approved': return 'BOOKING CONFIRMED';
+      case 'active': return 'ACTIVE TRIP';
+      case 'completed': return 'TRIP COMPLETED';
+      case 'cancelled': return 'BOOKING CANCELLED';
+      case 'rejected': return 'BOOKING REJECTED';
+      default: return 'GENERAL INQUIRY';
+    }
+  }
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: TextField(
+                controller: _textCtrl,
+                textCapitalization: TextCapitalization.sentences,
+                maxLines: 4,
+                minLines: 1,
+                maxLength: 1000,
+                style: const TextStyle(fontSize: 15),
+                decoration: const InputDecoration(
+                  hintText: 'Write a message...',
+                  hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                  counterText: '',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
             ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textCtrl,
-                    enabled: !isReadOnly,
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLines: 4,
-                    minLines: 1,
-                    maxLength: 1000,
-                    decoration: InputDecoration(
-                      hintText: isReadOnly ? 'Cannot send messages' : 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.grey.shade400),
-                      counterText: '', // Hide counter but keep limit
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: isReadOnly ? Colors.grey.shade300 : const Color(0xFF7C3AED),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                    onPressed: isReadOnly ? null : _sendMessage,
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _sendMessage,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)]),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -323,53 +370,54 @@ class _ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isMe ? const Color(0xFF7C3AED) : Colors.white,
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
-            bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message.text,
-              style: TextStyle(
-                color: isMe ? Colors.white : Colors.black87,
-                fontSize: 14,
-                height: 1.3,
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: isMe 
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)],
+                    )
+                  : null,
+              color: isMe ? null : Colors.white,
+              borderRadius: BorderRadius.circular(22).copyWith(
+                bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(22),
+                bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(22),
               ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _formatTime(message.createdAt),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isMe ? Colors.white70 : Colors.grey.shade500,
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: isMe 
+                      ? const Color(0xFF7C3AED).withValues(alpha: 0.15) 
+                      : Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-          ],
-        ),
+            child: Text(
+              message.text,
+              style: TextStyle(
+                color: isMe ? Colors.white : Colors.black87,
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Text(
+              _formatTime(message.createdAt),
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -390,23 +438,29 @@ class _SystemMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
+      margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
       alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text(
-          message.text,
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 12,
-            fontStyle: FontStyle.italic,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey.shade300.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              message.text,
+              style: GoogleFonts.inter(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
-          textAlign: TextAlign.center,
-        ),
+        ],
       ),
     );
   }
