@@ -256,6 +256,56 @@ class _LoginScreenState extends State<LoginScreen>
 
                                   const SizedBox(height: 32),
 
+                                  // Error message
+                                  Consumer<AuthProvider>(
+                                    builder: (_, auth, __) {
+                                      if (auth.status == AuthStatus.error &&
+                                          auth.errorMessage != null) {
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 16),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 12),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEF4444)
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: const Color(0xFFEF4444)
+                                                    .withValues(alpha: 0.2),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.error_outline,
+                                                  color: Color(0xFFF87171),
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    auth.errorMessage!,
+                                                    style: GoogleFonts.inter(
+                                                      color: const Color(
+                                                          0xFFF87171),
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+
                                   // Login button
                                   Consumer<AuthProvider>(
                                     builder: (_, auth, __) => SizedBox(

@@ -130,6 +130,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 foregroundColor: Colors.black,
                 elevation: 0,
                 surfaceTintColor: Colors.white,
+                leading: const BackButton(color: Colors.black),
               ),
               body: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),

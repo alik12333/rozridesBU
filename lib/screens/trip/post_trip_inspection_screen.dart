@@ -709,7 +709,7 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
         elevation: 0,
         surfaceTintColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: _step == 0 ? () => Navigator.pop(context) : _back,
         ),
       ),

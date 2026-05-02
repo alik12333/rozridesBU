@@ -368,7 +368,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           surfaceTintColor: Colors.white,
           automaticallyImplyLeading: false,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: _showBackDialog,
           ),
         ),
@@ -520,6 +520,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
         surfaceTintColor: Colors.white,
+        leading: const BackButton(color: Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),

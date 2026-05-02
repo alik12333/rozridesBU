@@ -138,6 +138,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pin Car Location'),
+        leading: const BackButton(color: Colors.black),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),

@@ -175,7 +175,7 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
         elevation: 0,
         surfaceTintColor: Colors.white,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: _currentStep == 0 ? () => Navigator.pop(context) : _back,
         ),
       ),

@@ -89,6 +89,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     try {
       status = AuthStatus.loading;
+      errorMessage = null;
       notifyListeners();
 
       final cred = await _authService.signUpWithEmail(email: email, password: password);
@@ -110,6 +111,11 @@ class AuthProvider extends ChangeNotifier {
       status = AuthStatus.idle;
       notifyListeners();
       return true;
+    } on FirebaseAuthException catch (e) {
+      errorMessage = _parseAuthError(e);
+      status = AuthStatus.error;
+      notifyListeners();
+      return false;
     } catch (e) {
       errorMessage = e.toString();
       status = AuthStatus.error;
@@ -121,6 +127,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signInWithEmail({required String email, required String password}) async {
     try {
       status = AuthStatus.loading;
+      errorMessage = null;
       notifyListeners();
 
       final cred = await _authService.signInWithEmail(email: email, password: password);
@@ -140,11 +147,41 @@ class AuthProvider extends ChangeNotifier {
       status = AuthStatus.idle;
       notifyListeners();
       return true;
-    } catch (e) {
-      errorMessage = e.toString();
+    } on FirebaseAuthException catch (e) {
+      errorMessage = _parseAuthError(e);
       status = AuthStatus.error;
       notifyListeners();
       return false;
+    } catch (e) {
+      errorMessage = e.toString().replaceFirst('Exception: ', '');
+      status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _parseAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return 'No user found with this email.';
+      case 'wrong-password':
+        return 'Incorrect password. Please try again.';
+      case 'invalid-email':
+        return 'The email address is not valid.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'email-already-in-use':
+        return 'An account already exists for this email.';
+      case 'weak-password':
+        return 'The password is too weak.';
+      case 'operation-not-allowed':
+        return 'Email/password accounts are not enabled.';
+      case 'invalid-credential':
+        return 'Invalid email or password.';
+      default:
+        return e.message ?? 'An unexpected error occurred.';
     }
   }
 

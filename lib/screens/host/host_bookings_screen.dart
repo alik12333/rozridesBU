@@ -54,36 +54,59 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
             foregroundColor: Colors.black,
             elevation: 0,
             surfaceTintColor: Colors.white,
-            bottom: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              indicatorColor: const Color(0xFF7C3AED),
-              labelColor: const Color(0xFF7C3AED),
-              unselectedLabelColor: Colors.grey.shade600,
-              labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
-              unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 13),
-              tabs: [
-                Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Text('Requests'),
-                  if (pendingCount > 0) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text('$pendingCount',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(60),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicator: BoxDecoration(
+                    color: const Color(0xFF7C3AED),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.grey.shade600,
+                  labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+                  unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+                  tabs: [
+                    Tab(child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('Requests'),
+                      if (pendingCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1),
+                          ),
+                          child: Text('$pendingCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ])),
+                    const Tab(text: 'Upcoming'),
+                    const Tab(text: 'Active'),
+                    const Tab(text: 'Flagged'),
+                    const Tab(text: 'Past'),
                   ],
-                ])),
-                const Tab(text: 'Upcoming'),
-                const Tab(text: 'Active'),
-                const Tab(text: 'Flagged'),
-                const Tab(text: 'Past'),
-              ],
+                ),
+              ),
             ),
           ),
           body: TabBarView(
