@@ -34,10 +34,15 @@ export default function NotificationBell() {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const newAlerts = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+            const newAlerts = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    title: data.title || 'Notification',
+                    body: data.body || '',
+                    type: data.type || 'info',
+                };
+            });
             setAlerts(newAlerts);
         });
 

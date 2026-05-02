@@ -31,7 +31,8 @@ export default function RecentActivityFeed() {
                 const data = doc.data();
                 return {
                     id: doc.id,
-                    ...data,
+                    status: data.status || 'UNKNOWN',
+                    note: data.note || '',
                     timestamp: data.timestamp?.toDate() || new Date()
                 };
             });
