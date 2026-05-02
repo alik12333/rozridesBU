@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 import '../providers/listing_provider.dart';
@@ -86,11 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.search_rounded, color: Colors.white),
-                  onPressed: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const MapSearchScreen())),
-                ),
+                _NotificationBell(userId: user?.id),
               ],
             ),
 
@@ -144,6 +141,64 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Notification Bell (AppBar Action) ────────────────────────────────────────
+class _NotificationBell extends StatelessWidget {
+  final String? userId;
+  const _NotificationBell({this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (userId == null) {
+      return const SizedBox.shrink();
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('isUnread', isEqualTo: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data?.docs.length ?? 0;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF3B30),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    unreadCount > 9 ? '9+' : '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -691,11 +746,6 @@ class _AppDrawer extends StatelessWidget {
                   icon: Icons.book_outlined,
                   label: 'My Bookings',
                   onTap: () => _go(context, const MyBookingsScreen()),
-                ),
-                _DrawerTile(
-                  icon: Icons.notifications_outlined,
-                  label: 'Notifications',
-                  onTap: () => _go(context, const NotificationsScreen()),
                 ),
                 _DrawerTile(
                   icon: Icons.map_outlined,

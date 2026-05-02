@@ -104,8 +104,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final otherName = _conversation!.otherPartyNameFor(widget.currentUserId);
     final otherPhoto = _conversation!.otherPartyPhotoFor(widget.currentUserId);
-    final isReadOnly = _conversation!.bookingStatus == 'completed' || 
-                       _conversation!.bookingStatus == 'cancelled' ||
+    // Only truly dead bookings lock the chat.
+    // 'completed' trips keep the chat open so renters can re-book.
+    final isReadOnly = _conversation!.bookingStatus == 'cancelled' ||
                        _conversation!.bookingStatus == 'rejected';
 
     return Scaffold(
@@ -171,11 +172,27 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              color: Colors.amber.shade50,
+              color: Colors.red.shade50,
               child: Text(
-                'This conversation is read-only. The booking has ended.',
+                'This booking was cancelled or rejected. Chat is read-only.',
                 style: TextStyle(
-                  color: Colors.amber.shade900,
+                  color: Colors.red.shade800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          // Show a friendly banner when the trip is complete but chat is still open
+          if (_conversation?.bookingStatus == 'completed')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              color: Colors.green.shade50,
+              child: Text(
+                '🎉 Trip completed! Feel free to book again.',
+                style: TextStyle(
+                  color: Colors.green.shade800,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
