@@ -129,9 +129,11 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
             TextField(
               controller: _flagReasonCtrl,
               maxLines: 3,
+              maxLength: 500,
               decoration: InputDecoration(
                 hintText: 'e.g. Scratches on front bumper not agreed by renter...',
                 hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                counterText: '',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -395,11 +397,13 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
             TextField(
               controller: _deductionCtrl,
               keyboardType: TextInputType.number,
+              maxLength: 8,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'Deduction for damage (PKR)',
                 prefixIcon: const Icon(Icons.money_off),
+                counterText: '',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,

@@ -258,10 +258,12 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
         TextField(
           controller: _depositCtrl,
           keyboardType: TextInputType.number,
+          maxLength: 8,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
             labelText: 'Amount Received (PKR)',
             prefixIcon: const Icon(Icons.money),
+            counterText: '',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true, fillColor: Colors.white,
           ),
@@ -362,8 +364,10 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
             const SizedBox(height: 12),
             TextField(
               onChanged: (v) => _updateItem(area, item.copyWith(notes: v)),
+              maxLength: 200,
               decoration: InputDecoration(
                 hintText: 'Describe the damage...',
+                counterText: '', // Hide counter
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 contentPadding: const EdgeInsets.all(12),
                 filled: true, fillColor: Colors.grey.shade50,
@@ -419,10 +423,12 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
           TextField(
             controller: _odometerCtrl,
             keyboardType: TextInputType.number,
+            maxLength: 7,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Current odometer reading (km)',
+              counterText: '',
               suffixText: 'km',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true, fillColor: Colors.grey.shade50,

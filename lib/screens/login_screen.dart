@@ -213,11 +213,16 @@ class _LoginScreenState extends State<LoginScreen>
                                     prefixIcon: Icons.email_outlined,
                                     keyboardType:
                                         TextInputType.emailAddress,
+                                    maxLength: 254,
                                     validator: (v) {
                                       if (v == null || v.isEmpty) {
                                         return 'Enter your email';
                                       }
-                                      if (!v.contains('@')) {
+                                      if (v.length < 5) {
+                                        return 'Email is too short';
+                                      }
+                                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                                      if (!emailRegex.hasMatch(v)) {
                                         return 'Enter a valid email';
                                       }
                                       return null;
@@ -234,6 +239,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     hint: '••••••••',
                                     prefixIcon: Icons.lock_outline_rounded,
                                     obscureText: _obscurePassword,
+                                    maxLength: 64,
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword
@@ -249,6 +255,9 @@ class _LoginScreenState extends State<LoginScreen>
                                     validator: (v) {
                                       if (v == null || v.isEmpty) {
                                         return 'Enter your password';
+                                      }
+                                      if (v.length < 6) {
+                                        return 'Password must be at least 6 characters';
                                       }
                                       return null;
                                     },
@@ -440,6 +449,7 @@ class _DarkField extends StatelessWidget {
   final Widget? suffixIcon;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
+  final int? maxLength;
 
   const _DarkField({
     required this.controller,
@@ -449,6 +459,7 @@ class _DarkField extends StatelessWidget {
     this.suffixIcon,
     this.keyboardType,
     this.validator,
+    this.maxLength,
   });
 
   @override
@@ -457,9 +468,11 @@ class _DarkField extends StatelessWidget {
         obscureText: obscureText,
         keyboardType: keyboardType,
         validator: validator,
+        maxLength: maxLength,
         style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
         decoration: InputDecoration(
           hintText: hint,
+          counterText: '',
           hintStyle: GoogleFonts.inter(
               color: Colors.white.withValues(alpha: 0.25), fontSize: 14),
           prefixIcon: Icon(prefixIcon,

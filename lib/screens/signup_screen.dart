@@ -242,7 +242,12 @@ class _SignupScreenState extends State<SignupScreen> {
                           label: 'Full Name',
                           hint: 'Enter your full name',
                           prefixIcon: Icons.person_outline,
-                          validator: (v) => (v == null || v.length < 3) ? 'Enter at least 3 characters' : null,
+                          maxLength: 50,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Please enter your name';
+                            if (v.length < 2) return 'Name is too short';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -252,7 +257,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           hint: 'your.email@example.com',
                           prefixIcon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
-                          validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                          maxLength: 254,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Enter your email';
+                            if (v.length < 5) return 'Email is too short';
+                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                            if (!emailRegex.hasMatch(v)) return 'Enter a valid email';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -262,8 +274,16 @@ class _SignupScreenState extends State<SignupScreen> {
                           hint: '3001234567',
                           prefixIcon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                          validator: (v) => (v == null || v.length != 10) ? 'Enter 10 digits' : null,
+                          maxLength: 20,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Enter your phone number';
+                            if (v.length != 10) return 'Enter exactly 10 digits';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -275,6 +295,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 label: 'City',
                                 hint: 'e.g. Lahore',
                                 prefixIcon: Icons.location_city,
+                                maxLength: 30,
                                 validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                               ),
                             ),
@@ -285,6 +306,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 label: 'Area',
                                 hint: 'e.g. Gulberg',
                                 prefixIcon: Icons.map,
+                                maxLength: 30,
                                 validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                               ),
                             ),
@@ -299,11 +321,16 @@ class _SignupScreenState extends State<SignupScreen> {
                           hint: 'Minimum 6 characters',
                           prefixIcon: Icons.lock_outline,
                           obscureText: _obscurePassword,
+                          maxLength: 64,
                           suffixIcon: IconButton(
                             icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
-                          validator: (v) => (v == null || v.length < 6) ? 'Minimum 6 characters' : null,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Enter a password';
+                            if (v.length < 6) return 'Minimum 6 characters';
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 16),
 
@@ -313,6 +340,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           hint: 'Re-enter password',
                           prefixIcon: Icons.lock_outline,
                           obscureText: _obscureConfirmPassword,
+                          maxLength: 64,
                           suffixIcon: IconButton(
                             icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
                             onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
@@ -334,6 +362,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           label: 'CNIC Number',
                           hint: 'Enter CNIC number',
                           keyboardType: TextInputType.number,
+                          maxLength: 13,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(13)],
                           validator: (v) => (v == null || v.length != 13) ? 'Enter 13 digits' : null,
                         ),

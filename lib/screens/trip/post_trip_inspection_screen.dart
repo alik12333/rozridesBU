@@ -335,8 +335,10 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
             const SizedBox(height: 10),
             TextField(
               onChanged: (v) => _updateItem(area, postItem.copyWith(notes: v)),
+              maxLength: 200,
               decoration: InputDecoration(
                 hintText: 'Describe the new damage (required)...',
+                counterText: '',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 contentPadding: const EdgeInsets.all(12),
@@ -476,10 +478,12 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
           TextField(
             controller: _odometerCtrl,
             keyboardType: TextInputType.number,
+            maxLength: 7,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Current odometer reading (km)',
+              counterText: '',
               suffixText: 'km',
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

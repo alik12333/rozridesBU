@@ -331,7 +331,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   label: 'Car Title',
                   hint: 'e.g., Toyota Corolla GLi 2020',
                   prefixIcon: Icons.title_rounded,
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter car title' : null,
+                  maxLength: 60,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Please enter car title';
+                    if (value.length < 5) return 'Title is too short';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -339,6 +344,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   label: 'Car Number (Private)',
                   hint: 'e.g., LEC-1234',
                   prefixIcon: Icons.numbers_rounded,
+                  maxLength: 15,
                   validator: (value) => value == null || value.isEmpty ? 'Car number is required for admin' : null,
                 ),
                 const SizedBox(height: 16),
@@ -350,6 +356,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         label: 'Brand',
                         hint: 'e.g., Toyota',
                         prefixIcon: Icons.branding_watermark_rounded,
+                        maxLength: 30,
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                     ),
@@ -360,6 +367,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         label: 'Model',
                         hint: 'e.g., Corolla',
                         prefixIcon: Icons.style_rounded,
+                        maxLength: 30,
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
                     ),
@@ -375,6 +383,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         hint: 'e.g., 2020',
                         prefixIcon: Icons.calendar_today_rounded,
                         keyboardType: TextInputType.number,
+                        maxLength: 4,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(4),
@@ -397,6 +406,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         hint: 'e.g., 45000',
                         prefixIcon: Icons.speed_rounded,
                         keyboardType: TextInputType.number,
+                        maxLength: 7,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                       ),
@@ -465,6 +475,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   label: 'Engine Size',
                   hint: 'e.g., 1300cc',
                   prefixIcon: Icons.settings_input_component_rounded,
+                  maxLength: 10,
                   validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                 ),
               ],
@@ -482,6 +493,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   hint: 'e.g., 5000',
                   prefixText: 'PKR ',
                   keyboardType: TextInputType.number,
+                  maxLength: 8,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Please enter price';
@@ -593,6 +605,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 TextFormField(
                   controller: _descriptionController,
                   maxLines: 5,
+                  maxLength: 1000,
                   decoration: InputDecoration(
                     hintText: 'Describe your car in detail...',
                     filled: true,

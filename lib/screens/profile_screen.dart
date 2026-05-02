@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _cityController = TextEditingController();
   final _areaController = TextEditingController();
@@ -33,15 +35,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.currentUser;
     if (user != null) {
+      _nameController.text = user.fullName;
       _emailController.text = user.email;
       _cityController.text = user.location?.city ?? '';
       _areaController.text = user.location?.area ?? '';
-      _phoneController.text = user.phoneNumber;
+      
+      // Strip +92 if present for display
+      String phone = user.phoneNumber;
+      if (phone.startsWith('+92')) phone = phone.substring(3);
+      _phoneController.text = phone;
     }
   }
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _cityController.dispose();
     _areaController.dispose();
@@ -65,10 +73,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return await ref.getDownloadURL();
   }
 
+  String _normalizePhone(String phone) {
+    phone = phone.trim();
+    if (phone.startsWith('0')) phone = phone.substring(1);
+    if (!phone.startsWith('+92')) phone = '+92$phone';
+    return phone;
+  }
+
   Future<void> _saveProfile() async {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.currentUser;
     if (user == null) return;
+
+    if (_nameController.text.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name must be at least 2 characters')));
+      return;
+    }
 
     if (_cityController.text.isEmpty || _areaController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,6 +107,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             await _uploadToStorage(user.id, _profileImage!, 'profile.jpg');
       }
 
+      if (_nameController.text.isNotEmpty) {
+        updates['fullName'] = _nameController.text.trim();
+      }
       if (_emailController.text.isNotEmpty) {
         updates['email'] = _emailController.text.trim();
       }
@@ -97,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         updates['location.area'] = _areaController.text.trim();
       }
       if (_phoneController.text.isNotEmpty) {
-        updates['phoneNumber'] = _phoneController.text.trim();
+        updates['phoneNumber'] = _normalizePhone(_phoneController.text);
       }
 
       await authProvider.updateProfile(updates);
@@ -360,10 +383,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         children: [
           CustomTextField(
+            controller: _nameController,
+            label: 'Full Name',
+            prefixIcon: Icons.person_outline,
+            maxLength: 50,
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Name cannot be empty';
+              if (v.length < 2) return 'Name is too short';
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+          CustomTextField(
             controller: _emailController,
             label: 'Email Address',
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
+            maxLength: 254,
           ),
           const SizedBox(height: 20),
           CustomTextField(
@@ -371,6 +407,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Phone Number',
             prefixIcon: Icons.phone_outlined,
             keyboardType: TextInputType.phone,
+            maxLength: 20,
+            prefixText: '+92 ',
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
           ),
           const SizedBox(height: 20),
           Row(
@@ -380,6 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: _cityController,
                   label: 'City',
                   prefixIcon: Icons.location_city_outlined,
+                  maxLength: 30,
                 ),
               ),
               const SizedBox(width: 16),
@@ -388,6 +431,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: _areaController,
                   label: 'Area',
                   prefixIcon: Icons.map_outlined,
+                  maxLength: 30,
                 ),
               ),
             ],

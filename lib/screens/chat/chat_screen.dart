@@ -275,9 +275,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     maxLines: 4,
                     minLines: 1,
+                    maxLength: 1000,
                     decoration: InputDecoration(
                       hintText: isReadOnly ? 'Cannot send messages' : 'Type a message...',
                       hintStyle: TextStyle(color: Colors.grey.shade400),
+                      counterText: '', // Hide counter but keep limit
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
