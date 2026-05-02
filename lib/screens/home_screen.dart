@@ -272,7 +272,7 @@ class _HeroBanner extends StatelessWidget {
 class _QuickActions extends StatelessWidget {
   final List<_QA> _actions = const [
     _QA(Icons.book_outlined, 'My\nBookings', MyBookingsScreen()),
-    _QA(Icons.inbox_rounded, 'Host\nInbox', HostBookingsScreen()),
+    _QA(Icons.inbox_rounded, 'Host\nBookings', HostBookingsScreen()),
     _QA(Icons.directions_car_outlined, 'My\nListings', MyListingsScreen()),
     _QA(Icons.add_circle_outline_rounded, 'Add\nListing', AddListingScreen()),
   ];

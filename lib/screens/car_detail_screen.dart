@@ -478,8 +478,13 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('${_pricingEstimate!.totalDays} days x PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16)),
-                                  Text('PKR ${(_pricingEstimate!.pricePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  Flexible(
+                                    child: Text('${_pricingEstimate!.totalDays} days x PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}',
+                                        style: const TextStyle(fontSize: 15)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('PKR ${(_pricingEstimate!.pricePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                               if (_pricingEstimate!.driverFeePerDay > 0) ...[
@@ -487,8 +492,13 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Driver fee (${_pricingEstimate!.totalDays} days x PKR ${_pricingEstimate!.driverFeePerDay.toStringAsFixed(0)})', style: const TextStyle(fontSize: 16)),
-                                    Text('PKR ${(_pricingEstimate!.driverFeePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                    Flexible(
+                                      child: Text('Driver fee (${_pricingEstimate!.totalDays} days x PKR ${_pricingEstimate!.driverFeePerDay.toStringAsFixed(0)})',
+                                          style: const TextStyle(fontSize: 15)),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('PKR ${(_pricingEstimate!.driverFeePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ],
@@ -496,8 +506,13 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Security deposit (at pickup)', style: TextStyle(fontSize: 16)),
-                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                  const Flexible(
+                                    child: Text('Security deposit (at pickup)',
+                                        style: TextStyle(fontSize: 15)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                                 ],
                               ),
                               const Padding(
@@ -507,8 +522,13 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Bring to pickup (Cash)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                  const Flexible(
+                                    child: Text('Bring to pickup (Cash)',
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
                                 ],
                               ),
                             ],
@@ -683,11 +703,15 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey.shade300,
               ),
-              child: Text(
-                (_selectedStart != null && _selectedEnd != null && _pricingEstimate != null)
-                  ? 'REQUEST TO BOOK - PKR ${_pricingEstimate!.netCostToRenter.toStringAsFixed(0)} total'
-                  : 'Select Dates to Continue',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  (_selectedStart != null && _selectedEnd != null && _pricingEstimate != null)
+                    ? 'REQUEST TO BOOK - PKR ${_pricingEstimate!.netCostToRenter.toStringAsFixed(0)} total'
+                    : 'Select Dates to Continue',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                ),
               ),
             ),
           ),

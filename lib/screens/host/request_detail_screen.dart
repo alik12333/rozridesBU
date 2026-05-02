@@ -613,7 +613,11 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text('DECLINE REQUEST',
+                          child: const Text(
+                              'DECLINE REQUEST',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),

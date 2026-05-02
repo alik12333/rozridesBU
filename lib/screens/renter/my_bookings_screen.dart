@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../booking/booking_detail_screen.dart';
 import '../reviews/submit_review_screen.dart';
+import '../../services/booking_service.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -399,7 +400,7 @@ class _BookingCardState extends State<_BookingCard> {
     switch (b.status) {
       case 'pending':
         secondary = _outlineBtn('Cancel Request', Colors.red.shade600, () =>
-            Navigator.of(context).pushNamed('/cancel', arguments: {'bookingId': b.id, 'cancelledBy': 'renter'}));
+            _confirmCancelRequest(context, b.id));
         primary = _fillBtn('View Details', const Color(0xFF7C3AED), () =>
             Navigator.push(context, MaterialPageRoute(builder: (_) => BookingDetailScreen(bookingId: b.id))));
         break;
@@ -435,6 +436,64 @@ class _BookingCardState extends State<_BookingCard> {
         Expanded(flex: secondary != null ? 2 : 1, child: primary),
       ]),
     );
+  }
+
+  Future<void> _confirmCancelRequest(BuildContext context, String bookingId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Cancel Request?',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: const Text(
+            'Are you sure you want to cancel this booking request? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep Request'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await BookingService().cancelBooking(
+        bookingId: bookingId,
+        reason: 'Cancelled by renter',
+        cancelledBy: 'renter',
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request cancelled successfully.'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cancelling: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _fillBtn(String label, Color color, VoidCallback onTap) => Container(
