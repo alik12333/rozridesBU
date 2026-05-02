@@ -42,9 +42,9 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
       ));
       return;
     }
-    if (_commentCtrl.text.trim().length < 20) {
+    if (_commentCtrl.text.trim().length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please write at least 20 characters.'),
+        content: Text('Please write at least 10 characters.'),
         backgroundColor: Colors.orange,
         behavior: SnackBarBehavior.floating,
       ));
@@ -99,8 +99,8 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
       backgroundColor: const Color(0xFFF7F8FC),
       appBar: AppBar(
         title: Text(
-          _isRenterReviewing ? 'Review your trip' : 'Review this renter',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          _isRenterReviewing ? 'Rate your trip' : 'Rate this renter',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -108,142 +108,174 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
         surfaceTintColor: Colors.white,
         leading: const BackButton(color: Colors.black),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Reviewee card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2))
-              ],
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(20).copyWith(bottom: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -4))],
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _submitting ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
             ),
-            child: Row(children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-                child: Text(
-                  _revieweeName.isNotEmpty ? _revieweeName[0].toUpperCase() : '?',
-                  style: GoogleFonts.outfit(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF7C3AED)),
-                ),
+            child: _submitting
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : Text('Submit Review', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Car / Info Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 15, offset: const Offset(0, 5))],
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                  child: Column(
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _revieweeName.isNotEmpty ? _revieweeName[0].toUpperCase() : '?',
+                        style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(widget.booking.carName,
-                        style: GoogleFonts.outfit(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text(_revieweeName,
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 14)),
-                  ])),
-            ]),
-          ),
-          const SizedBox(height: 28),
-
-          // Star rating
-          Text(
-            _isRenterReviewing
-                ? 'Rate your overall experience:'
-                : 'Rate this renter:',
-            style: GoogleFonts.outfit(
-                fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          _StarSelector(
-            rating: _rating,
-            onChanged: (v) => setState(() => _rating = v),
-          ),
-          const SizedBox(height: 28),
-
-          // Comment
-          Text(
-            'Tell others about your experience:',
-            style: GoogleFonts.outfit(
-                fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _commentCtrl,
-            maxLines: 5,
-            maxLength: 500,
-            decoration: InputDecoration(
-              hintText: _isRenterReviewing
-                  ? 'Was the car as described? How was the host to deal with?'
-                  : 'Was the renter responsible? Did they return on time and in good condition?',
-              hintMaxLines: 3,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14)),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.all(14),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Disclaimer
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.schedule, color: Colors.amber.shade700, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: Text(
-                'Your review will be posted after $_revieweeName also leaves their review, or after 7 days — whichever comes first.',
-                style: TextStyle(
-                    color: Colors.amber.shade800,
-                    fontSize: 12,
-                    height: 1.5),
-              )),
-            ]),
-          ),
-          const SizedBox(height: 32),
-
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _submitting ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                        Text(widget.booking.carName, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text('Trip with $_revieweeName', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              child: _submitting
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white))
-                  : const Text('SUBMIT REVIEW',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16)),
             ),
-          ),
-        ]),
+            
+            const SizedBox(height: 32),
+
+            // Star Rating Section
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    _rating == 0 ? 'How was your experience?' : _getRatingLabel(_rating),
+                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: _getRatingColor(_rating)),
+                  ),
+                  const SizedBox(height: 16),
+                  _StarSelector(
+                    rating: _rating,
+                    onChanged: (v) => setState(() => _rating = v),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Comment Section
+            Text('Write a detailed review', style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _commentCtrl,
+              maxLines: 5,
+              maxLength: 500,
+              style: const TextStyle(fontSize: 15, height: 1.5),
+              decoration: InputDecoration(
+                hintText: _isRenterReviewing
+                    ? 'How was the car\'s condition? Was the host helpful and punctual?'
+                    : 'How was the renter\'s behavior? Was the car returned clean and on time?',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                filled: true,
+                fillColor: Colors.white,
+                counterStyle: TextStyle(color: Colors.grey.shade500),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Warning / Disclaimer Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock_clock_rounded, color: Colors.blue.shade600, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Blind Review System', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue.shade800)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'To ensure honesty, your review remains hidden until $_revieweeName also submits theirs, or until 7 days pass.',
+                          style: TextStyle(color: Colors.blue.shade700, fontSize: 13, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
+  }
+
+  String _getRatingLabel(double rating) {
+    if (rating >= 5) return 'Exceptional! 🤩';
+    if (rating >= 4) return 'Great Experience! 😊';
+    if (rating >= 3) return 'It was Okay 😐';
+    if (rating >= 2) return 'Could be Better 😕';
+    if (rating >= 1) return 'Poor Experience 😞';
+    return 'Select a rating';
+  }
+
+  Color _getRatingColor(double rating) {
+    if (rating >= 4) return const Color(0xFF16A34A);
+    if (rating >= 3) return const Color(0xFFF59E0B);
+    if (rating >= 1) return const Color(0xFFEF4444);
+    return Colors.black87;
   }
 }
 
@@ -258,18 +290,25 @@ class _StarSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(5, (i) {
         final starValue = (i + 1).toDouble();
+        final isSelected = rating >= starValue;
+        
         return GestureDetector(
-          onTap: () => onChanged(starValue),
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Icon(
-              rating >= starValue ? Icons.star_rounded : Icons.star_outline_rounded,
-              color: rating >= starValue
-                  ? const Color(0xFFFACC15)
-                  : Colors.grey.shade400,
-              size: 40,
+          onTap: () {
+            onChanged(starValue);
+          },
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 150),
+            scale: isSelected ? 1.1 : 1.0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(
+                isSelected ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: isSelected ? const Color(0xFFFACC15) : Colors.grey.shade300,
+                size: 52,
+              ),
             ),
           ),
         );

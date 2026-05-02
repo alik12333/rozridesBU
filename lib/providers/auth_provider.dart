@@ -187,15 +187,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> loadUserProfile(String userId) async {
     try {
-      print('DEBUG: Loading profile for $userId');
       currentUser = await _authService.getUserProfile(userId);
-      print('DEBUG: User profile loaded: $currentUser');
-      if (currentUser == null) {
-        print('DEBUG: User profile is NULL for $userId');
-      }
       notifyListeners();
     } catch (e) {
-      print('DEBUG: Error loading profile: $e');
       errorMessage = e.toString();
       notifyListeners();
     }

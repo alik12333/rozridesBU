@@ -30,11 +30,25 @@ class CashSettlementScreen extends StatefulWidget {
 class _CashSettlementScreenState extends State<CashSettlementScreen> {
   final BookingService _service = BookingService();
   final TextEditingController _deductionCtrl = TextEditingController(text: '0');
+  final TextEditingController _flagReasonCtrl = TextEditingController();
 
   bool _rentConfirmed = false;
   bool _depositConfirmed = false;
   bool _renterAgreesToDeduction = false;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _deductionCtrl.text = widget.comparison.hasNewDamage ? '5000' : '0';
+  }
+
+  @override
+  void dispose() {
+    _deductionCtrl.dispose();
+    _flagReasonCtrl.dispose();
+    super.dispose();
+  }
 
   double get _deduction =>
       double.tryParse(_deductionCtrl.text) ?? 0;
@@ -104,17 +118,38 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Report this trip?'),
-        content: const Text(
-            'Are you sure you want to report this trip?\n\n'
-            'RozRides admin will review the inspection photos and your conversation with the host.\n'
-            'You will be notified of the outcome.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+                'Are you sure you want to report this trip?\n\n'
+                'Please explain the damage or issue for the admin:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _flagReasonCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'e.g. Scratches on front bumper not agreed by renter...',
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              if (_flagReasonCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please provide a reason.')));
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amber.shade700,
               foregroundColor: Colors.white,
@@ -135,6 +170,7 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
         hostId: widget.booking.hostId,
         renterId: widget.booking.renterId,
         hostClaimedAmount: _deduction,
+        description: _flagReasonCtrl.text.trim(),
         postInspection: widget.postInspection,
       );
       if (mounted) {
@@ -561,11 +597,5 @@ class _CashSettlementScreenState extends State<CashSettlementScreen> {
         child: hasIssue ? _scenarioB() : _scenarioA(),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _deductionCtrl.dispose();
-    super.dispose();
   }
 }

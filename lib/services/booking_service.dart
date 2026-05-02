@@ -1123,6 +1123,7 @@ class BookingService {
     required String hostId,
     required String renterId,
     required double hostClaimedAmount,
+    String? description,
     PostTripInspection? postInspection,
   }) async {
     final claimRef = _firestore.collection('damageClaims').doc();
@@ -1136,6 +1137,7 @@ class BookingService {
       hostId: hostId,
       renterId: renterId,
       hostClaimedAmount: hostClaimedAmount,
+      description: description,
       status: 'open',
       adminDecision: null,
       resolvedInFavorOf: null,

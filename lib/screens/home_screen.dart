@@ -514,7 +514,7 @@ class _CarCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '${listing.carName} ${listing.model}',
+                          listing.carName,
                           style: GoogleFonts.outfit(
                               fontSize: 17, fontWeight: FontWeight.bold),
                           maxLines: 1,

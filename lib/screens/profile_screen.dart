@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,8 +25,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _phoneController = TextEditingController();
 
   File? _profileImage;
-  File? _cnicFront;
-  File? _cnicBack;
   bool _isSaving = false;
 
   @override
@@ -59,8 +56,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       if (type == 'profile') _profileImage = File(picked.path);
-      if (type == 'cnic_front') _cnicFront = File(picked.path);
-      if (type == 'cnic_back') _cnicBack = File(picked.path);
     });
   }
 
@@ -188,7 +183,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            // Background Pattern/Image
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -198,7 +192,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-            // Glassmorphism effect overlay
             Positioned(
               top: -50,
               right: -50,
@@ -493,6 +486,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLogoutDialog(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
+    final navigator = Navigator.of(context);
+    
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -504,10 +500,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await context.read<AuthProvider>().signOut();
+              await authProvider.signOut();
               if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
+                navigator.pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
                 );

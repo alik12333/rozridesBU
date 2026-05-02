@@ -1,10 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 /// Result returned from the LocationPickerScreen.
-/// Contains the pinned coordinates + a human-readable label (e.g. "DHA Phase 6, Karachi").
 class LocationPickerResult {
   final LatLng latLng;
   final String locationLabel;
@@ -31,6 +32,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   bool _isLoading = true;
   bool _isGeocoding = false;
   String _locationLabel = 'Drag to set location...';
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
@@ -54,18 +56,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      setState(() => _isLoading = false);
-      return;
-    }
-
     try {
       final position = await Geolocator.getCurrentPosition();
+      final newPos = LatLng(position.latitude, position.longitude);
       setState(() {
-        _cameraCenter = LatLng(position.latitude, position.longitude);
+        _cameraCenter = newPos;
         _isLoading = false;
       });
-      await _reverseGeocode(_cameraCenter);
+      _mapController?.animateCamera(CameraUpdate.newLatLng(newPos));
+      await _reverseGeocode(newPos);
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -81,8 +80,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-
-        // Extract meaningful area name — sub-locality is most granular
         final area = place.subLocality?.isNotEmpty == true
             ? place.subLocality
             : place.locality?.isNotEmpty == true
@@ -95,7 +92,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
         final label = [area, city]
             .where((p) => p != null && p.isNotEmpty && p != area || p == area)
-            .toSet() // remove duplicates (when area == city)
+            .toSet()
             .join(', ');
 
         setState(() {
@@ -111,13 +108,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     }
   }
 
-  void _onCameraIdle(LatLng latLng) {
-    setState(() => _cameraCenter = latLng);
-    _reverseGeocode(latLng);
+  void _onCameraIdle() {
+    _reverseGeocode(_cameraCenter);
   }
 
   void _confirmLocation() {
-    // Parse city and area from label for Firestore
     final parts = _locationLabel.split(', ');
     final area = parts.length > 1 ? parts.first : null;
     final city = parts.length > 1 ? parts.last : parts.firstOrNull;
@@ -136,108 +131,206 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Pin Car Location'),
-        leading: const BackButton(color: Colors.black),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
-                foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Colors.white.withValues(alpha: 0.8),
+                child: const BackButton(color: Colors.black),
               ),
-              onPressed: _isGeocoding ? null : _confirmLocation,
-              child: const Text('CONFIRM', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
-        ],
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)))
           : Stack(
               children: [
                 GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: _cameraCenter,
-                    zoom: 14,
-                  ),
+                  initialCameraPosition: CameraPosition(target: _cameraCenter, zoom: 15),
+                  onMapCreated: (c) => _mapController = c,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  onCameraMove: (CameraPosition position) {
-                    // Update center silently while moving
-                    _cameraCenter = position.target;
-                  },
-                  onCameraIdle: () {
-                    _onCameraIdle(_cameraCenter);
-                  },
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  onCameraMove: (p) => _cameraCenter = p.target,
+                  onCameraIdle: _onCameraIdle,
                 ),
 
-                // Fixed center pin icon
-                const Center(
+                // Stylized Center Marker
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: 40.0),
-                    child: Icon(Icons.location_pin, size: 52, color: Color(0xFF7C3AED)),
-                  ),
-                ),
-
-                // Location label at bottom
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4))
-                      ],
-                    ),
-                    child: Row(
+                    padding: const EdgeInsets.only(bottom: 40.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.place, color: Color(0xFF7C3AED)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _isGeocoding
-                              ? const Text('Detecting location...', style: TextStyle(color: Colors.grey))
-                              : Text(
-                                  _locationLabel,
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                                  maxLines: 2,
-                                ),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7C3AED),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5))
+                            ],
+                          ),
+                          child: const Icon(Icons.directions_car_filled_rounded, color: Colors.white, size: 24),
+                        ),
+                        Container(
+                          width: 2,
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xFF7C3AED), Colors.transparent],
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                // Instruction chip at top
+                // Top Instruction Chip
                 Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
+                  top: MediaQuery.of(context).padding.top + 60,
+                  left: 20,
+                  right: 20,
+                  child: Center(
+                    child: ClipRRect(
                       borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8)
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.touch_app, size: 16, color: Colors.grey),
-                        SizedBox(width: 6),
-                        Text(
-                          'Drag the map to pin your car\'s exact location',
-                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Colors.white, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Drag the map to pin car location',
+                                style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
+                  ),
+                ),
+
+                // Floating Action Card
+                Positioned(
+                  bottom: 24,
+                  left: 20,
+                  right: 20,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Current Location FAB
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: FloatingActionButton(
+                          onPressed: _getUserLocation,
+                          backgroundColor: Colors.white,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.my_location_rounded, color: Color(0xFF7C3AED)),
+                        ),
+                      ),
+                      
+                      // Bottom Address Card
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
+                            )
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PICKUP LOCATION',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade500,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.location_on_rounded, color: Color(0xFF7C3AED), size: 20),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _isGeocoding
+                                      ? const LinearProgressIndicator(color: Color(0xFF7C3AED), backgroundColor: Color(0xFFF3E8FF))
+                                      : Text(
+                                          _locationLabel,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed: _isGeocoding ? null : _confirmLocation,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF7C3AED),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  elevation: 0,
+                                ),
+                                child: Text(
+                                  'Confirm Location',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

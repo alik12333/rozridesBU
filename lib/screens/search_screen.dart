@@ -391,7 +391,7 @@ class _SearchResultCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${listing.carName} ${listing.model}',
+                      listing.carName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

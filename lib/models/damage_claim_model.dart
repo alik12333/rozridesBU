@@ -7,6 +7,7 @@ class DamageClaim {
   final String hostId;
   final String renterId;
   final double hostClaimedAmount;
+  final String? description;
 
   /// 'open' | 'admin_reviewing' | 'decided' | 'resolved'
   final String status;
@@ -43,6 +44,7 @@ class DamageClaim {
     required this.hostId,
     required this.renterId,
     required this.hostClaimedAmount,
+    this.description,
     this.status = 'open',
     this.adminDecision,
     this.finalDeductionAmount,
@@ -65,6 +67,7 @@ class DamageClaim {
         'hostId': hostId,
         'renterId': renterId,
         'hostClaimedAmount': hostClaimedAmount,
+        'description': description,
         'status': status,
         'adminDecision': adminDecision,
         'resolvedInFavorOf': resolvedInFavorOf ?? adminDecision,
@@ -92,6 +95,7 @@ class DamageClaim {
         hostId: map['hostId'] as String? ?? '',
         renterId: map['renterId'] as String? ?? '',
         hostClaimedAmount: (map['hostClaimedAmount'] ?? 0).toDouble(),
+        description: map['description'] as String?,
         status: map['status'] as String? ?? 'open',
         adminDecision: map['adminDecision'] as String?,
         resolvedInFavorOf: map['resolvedInFavorOf'] as String?,

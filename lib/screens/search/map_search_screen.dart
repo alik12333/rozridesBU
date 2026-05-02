@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -44,7 +43,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
   void initState() {
     super.initState();
 
-    // 1) Ensure the spinner goes away after 2.5 seconds no matter what
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted && _isLoading) {
         if (_currentPosition == null) {
@@ -55,7 +53,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
       }
     });
 
-    // 2) Original logic
     _initMarkerIcons()
         .catchError((_) {})
         .whenComplete(() => _checkLocationPermissions());
@@ -70,8 +67,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     super.dispose();
   }
 
-  // ─── Marker icons ──────────────────────────────────────────────────────────
-
   Future<BitmapDescriptor> _buildCarIcon({
     required double size,
     required Color color,
@@ -82,9 +77,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     final canvas = Canvas(recorder);
     final center = Offset(canvasSize / 2, canvasSize / 2);
 
-    // Background circle
     canvas.drawCircle(center, canvasSize / 2, Paint()..color = backgroundColor);
-    // Border
     canvas.drawCircle(
       center,
       canvasSize / 2,
@@ -94,7 +87,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
         ..strokeWidth = 2,
     );
 
-    // Draw the car icon
     TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
     textPainter.text = TextSpan(
       text: String.fromCharCode(Icons.directions_car.codePoint),
@@ -113,7 +105,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
 
     final image = await recorder.endRecording().toImage(canvasSize, canvasSize);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
   Future<void> _initMarkerIcons() async {
@@ -128,8 +120,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
       backgroundColor: const Color(0xFF7C3AED),
     );
   }
-
-  // ─── Location ──────────────────────────────────────────────────────────────
 
   Future<void> _checkLocationPermissions() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -179,8 +169,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  // ─── Camera idle → re-query ────────────────────────────────────────────────
-
   void _onCameraIdle() async {
     if (!_mapController.isCompleted) return;
     final controller = await _mapController.future;
@@ -197,7 +185,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
       heading: 0.0, headingAccuracy: 0.0, speed: 0.0, speedAccuracy: 0.0,
     );
 
-    // Radius = distance from center to corner (covers full visible region)
     final distMeters = Geolocator.distanceBetween(
       centerLat, centerLng,
       bounds.northeast.latitude, bounds.northeast.longitude,
@@ -205,21 +192,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     _searchRadius = (distMeters / 1000).clamp(2.0, 150.0);
     _startGeoQuery();
   }
-
-  // ─── Geo query (THE CRITICAL FIX) ─────────────────────────────────────────
-  //
-  //  geoflutterfire_plus requires:
-  //    field = the KEY in the Firestore doc that contains the nested geo map
-  //    geopointFrom = a function that extracts GeoPoint from that nested map
-  //
-  //  Our Firestore docs now store:
-  //    { geo: { geopoint: GeoPoint, geohash: "..." }, ... flat fields ... }
-  //
-  //  Old WRONG approach:  field: 'location'  (flat GeoPoint — library can't read this)
-  //  Old WRONG approach:  field: 'geohash'   (just a string — library definitely can't use this)
-  //  CORRECT:             field: 'geo',  geopointFrom: (data) => data['geo']['geopoint']
-  //
-  // ──────────────────────────────────────────────────────────────────────────
 
   void _startGeoQuery() {
     if (_currentPosition == null) return;
@@ -236,18 +208,15 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
         .subscribeWithin(
           center: center,
           radiusInKm: _searchRadius,
-          field: 'geo', // ← nested geo map field
+          field: 'geo',
           geopointFrom: (data) {
-            // Extract GeoPoint from the nested geo map
             final geo = data['geo'];
             if (geo is Map && geo['geopoint'] is GeoPoint) {
               return geo['geopoint'] as GeoPoint;
             }
-            // Fallback: try reading the flat 'location' field for legacy docs
             if (data['location'] is GeoPoint) {
               return data['location'] as GeoPoint;
             }
-            // Must return something — return center as no-op
             return GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude);
           },
           strictMode: false,
@@ -257,14 +226,13 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
 
           final cars = docs
               .where((d) {
-                // Ensure the doc actually has location data before including it
-                final data = d.data() as Map<String, dynamic>?;
+                final data = d.data();
                 if (data == null) return false;
                 final hasGeo = data['geo'] is Map;
                 final hasLegacyLocation = data['location'] is GeoPoint;
                 return hasGeo || hasLegacyLocation;
               })
-              .map((d) => ListingModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+              .map((d) => ListingModel.fromMap(d.data()!, d.id))
               .where((car) => car.status == 'approved')
               .toList();
 
@@ -274,8 +242,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
           debugPrint('GeoQuery error: $e');
         });
   }
-
-  // ─── Markers ───────────────────────────────────────────────────────────────
 
   Future<void> _rebuildMarkers() async {
     if (_defaultMarkerIcon == null || _selectedMarkerIcon == null) return;
@@ -292,7 +258,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
         markerId: MarkerId(car.id),
         position: LatLng(car.location!.latitude, car.location!.longitude),
         icon: isSelected ? _selectedMarkerIcon! : _defaultMarkerIcon!,
-        zIndex: isSelected ? 2.0 : 1.0,
+        zIndexInt: isSelected ? 2 : 1,
         onTap: () {
           setState(() => _selectedListingId = car.id);
           _rebuildMarkers();
@@ -379,8 +345,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     }
   }
 
-  // ─── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -421,14 +385,13 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
   Widget _buildMapLayout() {
     return Stack(
       children: [
-        // ── Background: Full Screen Map ──────────────────────────────────────
         GoogleMap(
           initialCameraPosition: CameraPosition(
             target: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
             zoom: 13,
           ),
           myLocationEnabled: true,
-          myLocationButtonEnabled: false, // We'll add our own custom button
+          myLocationButtonEnabled: false,
           mapToolbarEnabled: false,
           zoomControlsEnabled: false,
           markers: _markers,
@@ -437,8 +400,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
             if (!_mapController.isCompleted) _mapController.complete(c);
           },
         ),
-
-        // ── Top: Floating Search Bar ─────────────────────────────────────────
         Positioned(
           top: 16,
           left: 16,
@@ -450,7 +411,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -486,8 +447,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
             ),
           ),
         ),
-
-        // ── Right: My Location FAB ───────────────────────────────────────────
         Positioned(
           bottom: _carsInRadius.isEmpty ? 32 : 160,
           right: 16,
@@ -507,8 +466,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
             child: Icon(Icons.my_location, color: Colors.grey.shade800),
           ),
         ),
-
-        // ── Bottom: Horizontal Cards ─────────────────────────────────────────
         if (_carsInRadius.isEmpty)
           Positioned(
             bottom: 32,
@@ -521,7 +478,7 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                   )
                 ],
@@ -585,14 +542,13 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isSelected ? 0.2 : 0.1),
+              color: Colors.black.withValues(alpha: isSelected ? 0.2 : 0.1),
               blurRadius: isSelected ? 16 : 8,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(children: [
-          // Image
           Container(
             width: 120,
             height: 120,
@@ -610,7 +566,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
                 ? const Icon(Icons.directions_car, size: 40, color: Colors.grey)
                 : null,
           ),
-          // Text
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -680,8 +635,6 @@ class _MapSearchScreenState extends State<MapSearchScreen> {
     );
   }
 }
-
-// ─── Toggle button ────────────────────────────────────────────────────────────
 
 class _ToggleBtn extends StatelessWidget {
   final String label;

@@ -15,6 +15,7 @@ interface ClaimData {
     hostId: string;
     renterId: string;
     hostClaimedAmount: number;
+    description?: string;
     status: string;
     adminDecision: string | null;
     resolvedInFavorOf: string | null;
@@ -28,9 +29,9 @@ interface ClaimData {
 }
 
 interface InspectionItem {
-    description?: string;
+    notes?: string;
     photoUrls: string[];
-    condition: string;
+    hasDamage: boolean;
 }
 
 interface Inspection {
@@ -251,14 +252,21 @@ export default function ClaimReviewPage() {
             <div className="space-y-6">
                 {Object.entries(inspection.items).map(([area, item]) => (
                     <div key={area} className="border rounded bg-white p-3 shadow-sm">
-                        <p className="font-bold capitalize mb-2">{area.replace('_', ' ')}</p>
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="font-bold capitalize">{area.replace('_', ' ')}</p>
+                            {item.hasDamage && (
+                                <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">
+                                    DAMAGE FOUND
+                                </span>
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             {item.photoUrls?.map((url, i) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={i} src={url} alt={area} className="w-full h-32 object-cover rounded cursor-pointer" onClick={() => window.open(url, '_blank')} />
                             ))}
                         </div>
-                        <p className="text-sm mt-2 text-gray-700">{item.description || 'No damage noted.'}</p>
+                        <p className="text-sm mt-2 text-gray-700">{item.notes || 'No notes provided.'}</p>
                     </div>
                 ))}
                 {(inspection.fuelLevel || inspection.odometerReading) && (
@@ -352,6 +360,13 @@ export default function ClaimReviewPage() {
                         Host Claimed Deduction: PKR {claim.hostClaimedAmount?.toLocaleString()}
                     </div>
                 </div>
+
+                {claim.description && (
+                    <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-1">Host Description of Damage</p>
+                        <p className="text-sm text-gray-800 italic">"{claim.description}"</p>
+                    </div>
+                )}
 
                 {isResolved ? (
                     <div className="bg-green-50 border border-green-200 rounded p-4 text-green-800">

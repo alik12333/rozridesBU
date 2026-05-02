@@ -7,10 +7,10 @@ class AvailabilityCalendar extends StatefulWidget {
   final Function(DateTime? start, DateTime? end) onRangeSelected;
 
   const AvailabilityCalendar({
-    Key? key,
+    super.key,
     required this.bookedDateRanges,
     required this.onRangeSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<AvailabilityCalendar> createState() => _AvailabilityCalendarState();
@@ -54,7 +54,9 @@ class _AvailabilityCalendarState extends State<AvailabilityCalendar> {
   void _onRangeSelected(DateTime? start, DateTime? end, DateTime focusedDay) {
     setState(() {
       _focusedDay = focusedDay;
-
+      _rangeStart = start;
+      _rangeEnd = end;
+      
       if (start != null && end != null) {
         if (_doesRangeContainBookedDates(start, end)) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -63,21 +65,16 @@ class _AvailabilityCalendarState extends State<AvailabilityCalendar> {
               backgroundColor: Colors.red,
             ),
           );
-          _rangeStart = start;
           _rangeEnd = null; // Reset the end date
-        } else {
-          _rangeStart = start;
-          _rangeEnd = end;
         }
-      } else {
-        _rangeStart = start;
-        _rangeEnd = end;
       }
       
       _rangeSelectionMode = RangeSelectionMode.toggledOn;
     });
 
-    widget.onRangeSelected(_rangeStart, _rangeEnd);
+    // If only start is selected, we pass it as both start and end to allow 1-day selection
+    // The user can still select a range by clicking another day.
+    widget.onRangeSelected(_rangeStart, _rangeEnd ?? _rangeStart);
   }
 
   @override

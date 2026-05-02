@@ -22,6 +22,7 @@ interface DamageClaim {
     renterId: string;
     hostId: string;
     hostClaimedAmount: number;
+    description?: string;
     status: string;
     createdAt: Date;
     
@@ -174,7 +175,16 @@ export default function ClaimsPage() {
                             filtered.map(claim => (
                                 <TableRow key={claim.claimId}>
                                     <TableCell className="font-mono text-xs">{claim.claimId.slice(0, 8)}</TableCell>
-                                    <TableCell>{claim.carName}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span>{claim.carName}</span>
+                                            {claim.description && (
+                                                <span className="text-[10px] text-muted-foreground italic line-clamp-1 max-w-[150px]">
+                                                    "{claim.description}"
+                                                </span>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{claim.renterName}</TableCell>
                                     <TableCell>{claim.hostName}</TableCell>
                                     <TableCell className="font-bold text-red-600">PKR {claim.hostClaimedAmount?.toLocaleString()}</TableCell>

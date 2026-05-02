@@ -1,5 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/listing_model.dart';
 import '../models/pricing_breakdown_model.dart';
@@ -30,6 +31,7 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
   CashPricingBreakdown? _pricingEstimate;
   List<ReviewModel> _reviews = [];
   bool _reviewsLoaded = false;
+  final PageController _pageController = PageController();
 
   @override
   void initState() {
@@ -37,49 +39,55 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
     _loadReviews();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadReviews() async {
-    final reviews = await BookingService().fetchCarReviews(widget.listing.id, limit: 3);
-    if (mounted) setState(() { _reviews = reviews; _reviewsLoaded = true; });
+    final reviews = await BookingService().fetchCarReviews(widget.listing.id, limit: 100);
+    if (mounted) {
+      setState(() {
+        _reviews = reviews;
+        _reviewsLoaded = true;
+      });
+    }
   }
 
   void _updatePricing() {
-    if (_selectedStart != null && _selectedEnd != null) {
+    if (_selectedStart != null) {
       try {
         final estimate = PricingCalculator.calculate(
           startDate: _selectedStart!,
-          endDate: _selectedEnd!,
+          endDate: _selectedEnd ?? _selectedStart!, // Support 1-day trip
           pricePerDay: widget.listing.pricePerDay,
-          securityDeposit: 10000.0, // Fixed PKR 10k standard deposit for MVP based on PDF
+          securityDeposit: 10000.0,
           withDriver: widget.listing.withDriver,
         );
-        setState(() { _pricingEstimate = estimate; });
+        setState(() {
+          _pricingEstimate = estimate;
+        });
       } catch (e) {
-        setState(() { _pricingEstimate = null; });
+        setState(() {
+          _pricingEstimate = null;
+        });
       }
     } else {
-      setState(() { _pricingEstimate = null; });
+      setState(() {
+        _pricingEstimate = null;
+      });
     }
   }
 
-  Future<void> _callOwner() async {
-    final phoneNumber = widget.listing.ownerPhone;
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
+  void _openFullScreenImage(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => _FullScreenImageViewer(
+        images: widget.listing.images,
+        initialIndex: index,
+      ),
     );
-
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not launch phone dialer'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _startChat() async {
@@ -127,49 +135,77 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeColor = const Color(0xFF7C3AED);
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       body: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          // App Bar with Image Carousel
+          // 1. Premium Hero Header
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 380,
             pinned: true,
+            stretch: false, // Important for horizontal PageView gestures
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: _circleAction(Icons.arrow_back, () => Navigator.pop(context)),
+            actions: [
+              _circleAction(Icons.share_outlined, () {}),
+              const SizedBox(width: 8),
+              _circleAction(Icons.favorite_border, () {}),
+              const SizedBox(width: 16),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Image Carousel
                   PageView.builder(
+                    controller: _pageController,
                     itemCount: widget.listing.images.length,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentImageIndex = index;
-                      });
-                    },
+                    onPageChanged: (i) => setState(() => _currentImageIndex = i),
                     itemBuilder: (context, index) {
-                      return Image.network(
-                        widget.listing.images[index],
-                        fit: BoxFit.cover,
+                      return GestureDetector(
+                        onTap: () => _openFullScreenImage(index),
+                        child: Hero(
+                          tag: 'car_image_$index',
+                          child: Image.network(
+                            widget.listing.images[index],
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       );
                     },
                   ),
-
-                  // Image Counter
-                  Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  Positioned.fill(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.4)],
+                          stops: const [0.7, 1.0],
+                        ),
                       ),
-                      child: Text(
-                        '${_currentImageIndex + 1}/${widget.listing.images.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 24,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        widget.listing.images.length,
+                        (index) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: _currentImageIndex == index ? 24 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _currentImageIndex == index ? Colors.white : Colors.white.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                         ),
                       ),
                     ),
@@ -179,666 +215,346 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
             ),
           ),
 
-          // Content
+          // 2. Car Primary Info
           SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Price Section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade200),
-                    ),
-                  ),
-                  child: Column(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                      const Text(
-                        'Rental Price Per Day',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(Icons.shield_outlined, size: 18, color: Colors.green.shade700),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Security Deposit: PKR 10,000',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.green.shade800,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.money, size: 16, color: Colors.green),
-                            SizedBox(width: 8),
-                            Text(
-                              'All payments are CASH paid directly to host',
-                              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+                            Text(widget.listing.carName,
+                                style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 16,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                _metaItem(Icons.star_rounded, '${widget.listing.averageRating.toStringAsFixed(1)} (${_reviews.length} reviews)', const Color(0xFFFACC15)),
+                                _metaItem(Icons.verified_rounded, 'Verified Car', Colors.blue),
+                              ],
                             ),
                           ],
                         ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('PKR ${widget.listing.pricePerDay.toInt()}',
+                              style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.bold, color: themeColor)),
+                          Text('/ day', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade500)),
+                        ],
                       )
                     ],
                   ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 24),
+                  Row(
                     children: [
-                      // Title
-                      Text(
-                        widget.listing.carName,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Subtitle
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.listing.year}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Icon(Icons.speed, size: 16, color: Colors.grey.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.listing.mileage} KM',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // Specifications
-                      const Text(
-                        'Specifications',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      _SpecRow(icon: Icons.branding_watermark, label: 'Brand', value: widget.listing.brand),
-                      _SpecRow(icon: Icons.style, label: 'Model', value: widget.listing.model),
-                      _SpecRow(icon: Icons.settings, label: 'Engine', value: widget.listing.engineSize),
-                      _SpecRow(icon: Icons.local_gas_station, label: 'Fuel Type', value: widget.listing.fuelType),
-                      _SpecRow(icon: Icons.settings_input_component, label: 'Transmission', value: widget.listing.transmission),
-
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // Features
-                      const Text(
-                        'Features & Services',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _FeatureChip(
-                            icon: widget.listing.withDriver ? Icons.person : Icons.person_off,
-                            label: widget.listing.withDriver ? 'With Driver' : 'Self Drive',
-                            color: widget.listing.withDriver ? Colors.blue : Colors.grey,
-                          ),
-                          _FeatureChip(
-                            icon: widget.listing.hasInsurance ? Icons.shield : Icons.warning,
-                            label: widget.listing.hasInsurance ? 'Insured' : 'No Insurance',
-                            color: widget.listing.hasInsurance ? Colors.green : Colors.orange,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // Description
-                      const Text(
-                        'Description',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.listing.description,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // Location
-                      if (widget.listing.city != null || widget.listing.area != null) ...[
-                        const Text(
-                          'Location',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: widget.listing.location != null ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CarLocationMapScreen(
-                                  location: widget.listing.location!,
-                                  carName: widget.listing.carName,
-                                ),
-                              ),
-                            );
-                          } : null,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Row(
-                              children: [
-                                Icon(Icons.location_on, color: Colors.red.shade400),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '${widget.listing.area ?? ''}, ${widget.listing.city ?? ''}',
-                                    style: TextStyle(fontSize: 16, color: widget.listing.location != null ? Theme.of(context).primaryColor : Colors.black),
-                                  ),
-                                ),
-                                if (widget.listing.location != null)
-                                  Icon(Icons.arrow_forward_ios, size: 14, color: Theme.of(context).primaryColor),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Divider(),
-                        const SizedBox(height: 24),
-                      ],
-
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Availability',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _selectedStart = DateTime.now();
-                                _selectedEnd = DateTime.now();
-                              });
-                              _updatePricing();
-                            },
-                            icon: const Icon(Icons.flash_on, size: 16),
-                            label: const Text('1 Day (Today)'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-                              foregroundColor: const Color(0xFF7C3AED),
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      AvailabilityCalendar(
-                        bookedDateRanges: widget.listing.bookedDateRanges,
-                        onRangeSelected: (start, end) {
-                          setState(() {
-                            _selectedStart = start;
-                            _selectedEnd = end;
-                          });
-                          _updatePricing();
-                        },
-                      ),
-
-                      // Trip Estimate Section
-                      if (_pricingEstimate != null) ...[
-                        const SizedBox(height: 32),
-                        const Text(
-                          'Trip Estimate',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Flexible(
-                                    child: Text('${_pricingEstimate!.totalDays} days x PKR ${widget.listing.pricePerDay.toStringAsFixed(0)}',
-                                        style: const TextStyle(fontSize: 15)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('PKR ${(_pricingEstimate!.pricePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}',
-                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                              if (_pricingEstimate!.driverFeePerDay > 0) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Flexible(
-                                      child: Text('Driver fee (${_pricingEstimate!.totalDays} days x PKR ${_pricingEstimate!.driverFeePerDay.toStringAsFixed(0)})',
-                                          style: const TextStyle(fontSize: 15)),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text('PKR ${(_pricingEstimate!.driverFeePerDay * _pricingEstimate!.totalDays).toStringAsFixed(0)}',
-                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Flexible(
-                                    child: Text('Security deposit (at pickup)',
-                                        style: TextStyle(fontSize: 15)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}',
-                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                child: Divider(),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Flexible(
-                                    child: Text('Bring to pickup (Cash)',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text('PKR ${_pricingEstimate!.depositAtPickup.toStringAsFixed(0)}',
-                                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 32),
-                      const Text(
-                        'How Cash Works',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildTimelineStep('1', 'Pay deposit at pickup', 'Hand over cash keys and sign the agreement.'),
-                            _buildTimelineStep('2', 'Take the car', 'Enjoy your ride safely.'),
-                            _buildTimelineStep('3', 'Return car at end of trip', 'Meet the host again to complete the trip.'),
-                            _buildTimelineStep('4', 'Pay rent, get deposit back', 'Host inspects car. You pay rent, host refunds deposit.'),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // Owner Info
-                      const Text(
-                        'Host Information',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 30,
-                              child: Icon(Icons.person, size: 30),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.listing.ownerName,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.listing.ownerPhone,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.verified, size: 16, color: Colors.green),
-                                      const SizedBox(width: 4),
-                                      Text('Verified Host', style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ],
-                                  )
-                                ],
-                              ),
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                                color: const Color(0xFF7C3AED),
-                                onPressed: _startChat,
-                                tooltip: 'Message Host',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 24),
-
-                      // ── Reviews Section ──────────────────────────────────
-                      _ReviewsSection(
-                        listing: widget.listing,
-                        reviews: _reviews,
-                        loaded: _reviewsLoaded,
-                      ),
-
-                      const SizedBox(height: 100), // bottom button space
+                      _featureIcon(Icons.calendar_today_rounded, '${widget.listing.year}'),
+                      _featureIcon(Icons.speed_rounded, '${widget.listing.mileage} km'),
+                      _featureIcon(Icons.settings_input_component_rounded, widget.listing.transmission),
+                      _featureIcon(Icons.local_gas_station_rounded, widget.listing.fuelType),
                     ],
                   ),
+                ],
+              ),
+            ),
+          ),
+
+          // 3. Detailed Sections
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _sectionTitle('Host'),
+                _hostCard(),
+                const SizedBox(height: 32),
+                
+                _sectionTitle('Description'),
+                Text(widget.listing.description,
+                    style: GoogleFonts.inter(fontSize: 15, color: Colors.blueGrey.shade700, height: 1.6)),
+                const SizedBox(height: 32),
+
+                _sectionTitle('Location'),
+                _locationCard(),
+                const SizedBox(height: 32),
+
+                _sectionTitle('Availability'),
+                const SizedBox(height: 12),
+                AvailabilityCalendar(
+                  bookedDateRanges: widget.listing.bookedDateRanges,
+                  onRangeSelected: (start, end) {
+                    setState(() { _selectedStart = start; _selectedEnd = end; });
+                    _updatePricing();
+                  },
                 ),
+                const SizedBox(height: 32),
+
+                if (_pricingEstimate != null) ...[
+                  _sectionTitle('Trip Summary'),
+                  _pricingCard(),
+                  const SizedBox(height: 32),
+                ],
+
+                _sectionTitle('How it works'),
+                _howItWorks(),
+                const SizedBox(height: 32),
+
+                _sectionTitle('Reviews'),
+                _ReviewsSection(listing: widget.listing, reviews: _reviews, loaded: _reviewsLoaded),
+                const SizedBox(height: 120),
+              ]),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _bottomAction(themeColor),
+    );
+  }
+
+  // Helper Widgets
+  Widget _circleAction(IconData icon, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.8), shape: BoxShape.circle),
+            child: IconButton(icon: Icon(icon, size: 20, color: Colors.black87), onPressed: onTap),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _metaItem(IconData icon, String label, Color color) {
+    return Row(children: [
+      Icon(icon, size: 18, color: color),
+      const SizedBox(width: 4),
+      Text(label, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blueGrey.shade700)),
+    ]);
+  }
+
+  Widget _featureIcon(IconData icon, String label) {
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(16)),
+            child: Icon(icon, color: const Color(0xFF64748B), size: 22),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(title, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+    );
+  }
+
+  Widget _hostCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.blueGrey.shade100),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+            child: Text(widget.listing.ownerName[0].toUpperCase(),
+                style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED))),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.listing.ownerName, style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold)),
+                Text('Joined 2024 • Verified', style: GoogleFonts.outfit(fontSize: 13, color: Colors.blueGrey.shade500)),
               ],
             ),
           ),
+          _circleIconButton(Icons.chat_bubble_outline_rounded, _startChat),
         ],
       ),
+    );
+  }
 
-      bottomNavigationBar: Container(
+  Widget _circleIconButton(IconData icon, VoidCallback onTap) {
+    return Container(
+      decoration: BoxDecoration(color: const Color(0xFF7C3AED).withValues(alpha: 0.1), shape: BoxShape.circle),
+      child: IconButton(icon: Icon(icon, color: const Color(0xFF7C3AED)), onPressed: onTap),
+    );
+  }
+
+  Widget _locationCard() {
+    return InkWell(
+      onTap: () {
+        if (widget.listing.location != null) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => CarLocationMapScreen(location: widget.listing.location!, carName: widget.listing.carName)));
+        }
+      },
+      child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.shade300,
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.blueGrey.shade100)),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.location_on_rounded, color: Colors.red.shade400),
             ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${widget.listing.area}, ${widget.listing.city}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text('Precise location shared after booking', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.grey),
           ],
         ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 50,
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: (_selectedStart != null && _selectedEnd != null) ? () {
-                final user = context.read<AuthProvider>().currentUser;
-                if (user == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please login to book.')),
-                  );
-                  return;
-                }
-                if (user.id == widget.listing.ownerId) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('You cannot book your own car.')),
-                  );
-                  return;
-                }
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => BookingSummaryScreen(
-                      listing: widget.listing,
-                      startDate: _selectedStart!,
-                      endDate: _selectedEnd!,
-                      pricing: _pricingEstimate!,
-                    ),
-                  ),
-                );
-              } : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey.shade300,
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  (_selectedStart != null && _selectedEnd != null && _pricingEstimate != null)
-                    ? 'REQUEST TO BOOK - PKR ${_pricingEstimate!.netCostToRenter.toStringAsFixed(0)} total'
-                    : 'Select Dates to Continue',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
-}
 
-// -----------------------------------------------------------------------------
-// Helper Widgets
-// -----------------------------------------------------------------------------
-
-class _SpecRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _SpecRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _FeatureChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _pricingCard() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          _pricingRow('Daily Rate', 'PKR ${widget.listing.pricePerDay.toInt()} x ${_pricingEstimate!.totalDays}'),
+          if (_pricingEstimate!.driverFeePerDay > 0) _pricingRow('Driver Service', 'PKR ${_pricingEstimate!.driverFeePerDay.toInt()} / day'),
+          const Divider(height: 32),
+          _pricingRow('Total Rental', 'PKR ${_pricingEstimate!.netCostToRenter.toInt()}', isBold: true),
+          _pricingRow('Security Deposit', 'PKR ${_pricingEstimate!.depositAtPickup.toInt()}', color: Colors.blue.shade700),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(12)),
+            child: Row(children: [
+              const Icon(Icons.info_outline_rounded, size: 16, color: Colors.green),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Pay PKR ${_pricingEstimate!.depositAtPickup.toInt()} cash at handover.', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green.shade800))),
+            ]),
+          )
         ],
       ),
     );
   }
-}
 
-Widget _buildTimelineStep(String number, String title, String subtitle) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: const BoxDecoration(
-            color: Color(0xFF7C3AED),
-            shape: BoxShape.circle,
+  Widget _pricingRow(String label, String value, {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 15, color: Colors.blueGrey.shade600)),
+          Text(value, style: GoogleFonts.inter(fontSize: 15, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, color: color ?? Colors.black87)),
+        ],
+      ),
+    );
+  }
+
+  Widget _howItWorks() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.blueGrey.shade100)),
+      child: Column(
+        children: [
+          _stepRow('01', 'Request Booking', 'Select dates and send request to host.'),
+          _stepRow('02', 'Host Confirms', 'Once accepted, meet the host for handover.'),
+          _stepRow('03', 'Security Deposit', 'Pay deposit in cash and take the keys.'),
+          _stepRow('04', 'Return & Pay', 'Return the car, pay rent, and get deposit back.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepRow(String num, String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(num, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED))),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(desc, style: GoogleFonts.inter(fontSize: 13, color: Colors.blueGrey.shade500)),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomAction(Color color) {
+    bool canBook = _selectedStart != null && _pricingEstimate != null;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -4))]),
+      child: SafeArea(
+        child: ElevatedButton(
+          onPressed: canBook ? () {
+            final user = context.read<AuthProvider>().currentUser;
+            if (user == null) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to book.')));
+              return;
+            }
+            if (user.id == widget.listing.ownerId) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You cannot book your own car.')));
+              return;
+            }
+            Navigator.push(context, MaterialPageRoute(builder: (_) => BookingSummaryScreen(listing: widget.listing, startDate: _selectedStart!, endDate: _selectedEnd ?? _selectedStart!, pricing: _pricingEstimate!)));
+          } : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: Colors.blueGrey.shade200,
+            minimumSize: const Size(double.infinity, 60),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            elevation: 0,
           ),
-          alignment: Alignment.center,
-          child: Text(number, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          child: Text(canBook ? 'Request to Book' : 'Select Trip Dates', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-            ],
-          ),
-        )
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
-
-// ─── Reviews Section ─────────────────────────────────────────────────────────
 
 class _ReviewsSection extends StatelessWidget {
   final ListingModel listing;
@@ -853,175 +569,155 @@ class _ReviewsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayCount = (reviews.length > listing.totalReviews) ? reviews.length : listing.totalReviews;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Header with average
-      Row(children: [
-        Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Reviews',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          if (listing.totalReviews > 0) ...[
-            const SizedBox(height: 4),
-            Row(children: [
-              const Icon(Icons.star_rounded,
-                  color: Color(0xFFFACC15), size: 18),
-              const SizedBox(width: 4),
-              Text(listing.averageRating.toStringAsFixed(1),
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(' (${listing.totalReviews} ${listing.totalReviews == 1 ? "review" : "reviews"})',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-            ])
-          ],
-        ])),
-        if (listing.totalReviews > 3)
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => AllReviewsScreen(
-                        targetId: listing.id,
-                        targetName: listing.carName,
-                        type: 'car',
-                      )),
-            ),
-            child: Text('View all ${listing.totalReviews}',
-                style: const TextStyle(color: Color(0xFF7C3AED))),
-          ),
-      ]),
+      if (displayCount > 0)
+        Row(children: [
+          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 24),
+          const SizedBox(width: 8),
+          Text(listing.averageRating.toStringAsFixed(1), style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Text('•  $displayCount ${displayCount == 1 ? "review" : "reviews"}', style: GoogleFonts.outfit(fontSize: 16, color: Colors.blueGrey.shade500, fontWeight: FontWeight.w600)),
+        ])
+      else
+        Text('No reviews yet', style: GoogleFonts.outfit(fontSize: 16, color: Colors.blueGrey.shade500)),
+      
+      const SizedBox(height: 24),
 
-      // Rating breakdown bars
-      if (listing.totalReviews > 0) ...[
-        const SizedBox(height: 16),
-        ...List.generate(5, (i) {
-          final star = (5 - i).toString();
-          final count = listing.ratingBreakdown[star] ?? 0;
-          final pct = listing.totalReviews > 0
-              ? count / listing.totalReviews
-              : 0.0;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              Text('$star ★',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: pct,
-                  backgroundColor: Colors.grey.shade200,
-                  color: const Color(0xFFFACC15),
-                  minHeight: 8,
-                ),
-              )),
-              const SizedBox(width: 8),
-              SizedBox(
-                  width: 24,
-                  child: Text('$count',
-                      style: TextStyle(
-                          color: Colors.grey.shade600, fontSize: 12))),
-            ]),
-          );
-        }),
-        const SizedBox(height: 16),
-      ],
-
-      // Review cards (max 3)
       if (!loaded)
         const Center(child: CircularProgressIndicator())
       else if (reviews.isEmpty)
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          alignment: Alignment.center,
-          child: Text('No reviews yet. Be the first to review this car!',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
-        )
+        const SizedBox.shrink()
       else
-        ...reviews.map((r) => _SmallReviewCard(review: r)),
+        ...reviews.take(3).map((r) => _ReviewTile(review: r)),
 
-      if (reviews.length >= 3 && listing.totalReviews > 3)
-        Center(
-          child: TextButton.icon(
-            icon: const Icon(Icons.arrow_forward,
-                size: 16, color: Color(0xFF7C3AED)),
-            label: const Text('View all reviews',
-                style: TextStyle(color: Color(0xFF7C3AED))),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => AllReviewsScreen(
-                        targetId: listing.id,
-                        targetName: listing.carName,
-                        type: 'car',
-                      )),
+      if (displayCount > 3)
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AllReviewsScreen(targetId: listing.id, targetName: listing.carName, type: 'car'))),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: Colors.blueGrey.shade200),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
+            child: Text('Show all $displayCount reviews', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87)),
           ),
         ),
     ]);
   }
 }
 
-class _SmallReviewCard extends StatelessWidget {
+class _ReviewTile extends StatelessWidget {
   final ReviewModel review;
-  const _SmallReviewCard({required this.review});
+  const _ReviewTile({required this.review});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-            child: Text(
-              review.reviewerName.isNotEmpty
-                  ? review.reviewerName[0].toUpperCase()
-                  : '?',
-              style: const TextStyle(
-                  color: Color(0xFF7C3AED),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-              child: Text(review.reviewerName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13))),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(5, (i) {
-              return Icon(
-                (i + 1).toDouble() <= review.overallRating
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                color: (i + 1).toDouble() <= review.overallRating
-                    ? const Color(0xFFFACC15)
-                    : Colors.grey.shade300,
-                size: 14,
-              );
-            }),
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                child: Text(review.reviewerName[0].toUpperCase(), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED))),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(review.reviewerName, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text('Verified Trip', style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade400)),
+                ],
+              ),
+            ],
           ),
-        ]),
-        const SizedBox(height: 8),
-        Text(review.comment,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 13,
-                height: 1.4)),
-      ]),
+          const SizedBox(height: 12),
+          Text(review.comment, style: GoogleFonts.inter(fontSize: 14, color: Colors.blueGrey.shade700, height: 1.5)),
+        ],
+      ),
     );
   }
 }
 
+// ─── Full Screen Image Viewer ───────────────────────────────────────────────
+
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _controller;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            controller: _controller,
+            itemCount: widget.images.length,
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            itemBuilder: (context, index) {
+              return Hero(
+                tag: 'car_image_$index',
+                child: InteractiveViewer(
+                  child: Image.network(widget.images[index], fit: BoxFit.contain),
+                ),
+              );
+            },
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            left: 10,
+            child: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                '${_currentIndex + 1} / ${widget.images.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

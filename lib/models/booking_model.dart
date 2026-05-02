@@ -162,9 +162,7 @@ class BookingModel {
             : createdAt.add(const Duration(hours: 24)),
       );
     } catch (e) {
-      print('Error parsing BookingModel: $e');
-      // Return a fallback model so the stream doesn't crash completely,
-      // though usually we want to just throw. For debugging, let's print.
+      // Log error internally or rethrow without printing to console in production
       rethrow;
     }
   }
