@@ -41,6 +41,7 @@ export interface Listing {
     ownerName: string;
     ownerPhone: string;
     carName: string;
+    carNumber?: string;
     brand: string;
     model: string;
     year: number;

@@ -761,9 +761,10 @@ class _AppDrawer extends StatelessWidget {
                 ),
                 _DrawerTile(
                   icon: Icons.directions_car_outlined,
-                  label: 'My Listings',
+                  label: 'My Cars',
                   onTap: () => _go(context, const MyListingsScreen()),
                 ),
+
                 _DrawerTile(
                   icon: Icons.add_circle_outline_rounded,
                   label: 'Add a Listing',

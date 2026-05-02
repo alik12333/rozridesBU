@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -8,7 +10,7 @@ import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import 'login_screen.dart';
 import 'my_listings_screen.dart';
-import 'host/incoming_requests_screen.dart';
+import 'host/host_bookings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -85,27 +87,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final updates = <String, dynamic>{};
 
-      // Profile image
       if (_profileImage != null) {
         updates['profilePhoto'] =
-        await _uploadToStorage(user.id, _profileImage!, 'profile.jpg');
+            await _uploadToStorage(user.id, _profileImage!, 'profile.jpg');
       }
 
-      // CNIC images
-      if (_cnicFront != null || _cnicBack != null) {
-        updates['cnic'] = {
-          'frontImage': _cnicFront != null
-              ? await _uploadToStorage(user.id, _cnicFront!, 'cnic/front.jpg')
-              : user.cnic?.frontImage,
-          'backImage': _cnicBack != null
-              ? await _uploadToStorage(user.id, _cnicBack!, 'cnic/back.jpg')
-              : user.cnic?.backImage,
-          'verificationStatus': 'pending',
-          'number': user.cnic?.number,
-        };
-      }
-
-      // Text fields
       if (_emailController.text.isNotEmpty) {
         updates['email'] = _emailController.text.trim();
       }
@@ -123,13 +109,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Color(0xFF7C3AED),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -149,342 +138,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FC),
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 200.0,
-            floating: false,
-            pinned: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                tooltip: 'Logout',
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Logout'),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirmed == true && mounted) {
-                    await authProvider.signOut();
-                    if (mounted) {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const LoginScreen()),
-                        (route) => false,
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Theme.of(context).primaryColor,
-                      Theme.of(context).primaryColorDark,
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 40),
-                      Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.grey[200],
-                              backgroundImage: _profileImage != null
-                                  ? FileImage(_profileImage!)
-                                  : (user.profilePhoto != null
-                                      ? NetworkImage(user.profilePhoto!) as ImageProvider
-                                      : null),
-                              child: (_profileImage == null && user.profilePhoto == null)
-                                  ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                                  : null,
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: GestureDetector(
-                              onTap: () => _pickImage(ImageSource.gallery, 'profile'),
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.camera_alt,
-                                  color: Theme.of(context).primaryColor,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        user.fullName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          _buildHeader(context, user),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Host Shortcuts (Temporarily ignoring isOwner check for testing)
-                  Text(
-                    'Host Shortcuts',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildMenuTile(
-                    context: context,
-                    icon: Icons.directions_car_rounded,
-                    label: 'My Listed Cars',
-                    subtitle: 'View, edit or remove your car listings',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MyListingsScreen(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMenuTile(
-                    context: context,
-                    icon: Icons.inbox_rounded,
-                    label: 'Incoming Requests',
-                    subtitle: 'View and manage booking requests',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const IncomingRequestsScreen(),
-                      ),
-                    ),
-                  ),
+                  _buildReputationSection(user),
                   const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 24),
-
-                  // Ratings section
-                  if ((user.hostRating ?? 0) > 0 || (user.renterRating ?? 0) > 0) ...[
-                    Text('Reputation', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 12),
-                    Row(children: [
-                      if ((user.hostRating ?? 0) > 0)
-                        Expanded(child: _RatingBadge(
-                          label: 'As Host',
-                          rating: user.hostRating!,
-                          count: user.hostReviewCount ?? 0,
-                          color: const Color(0xFF7C3AED),
-                        )),
-                      if ((user.hostRating ?? 0) > 0 && (user.renterRating ?? 0) > 0)
-                        const SizedBox(width: 12),
-                      if ((user.renterRating ?? 0) > 0)
-                        Expanded(child: _RatingBadge(
-                          label: 'As Renter',
-                          rating: user.renterRating!,
-                          count: user.renterReviewCount ?? 0,
-                          color: const Color(0xFF0EA5E9),
-                        )),
-                    ]),
-                    const SizedBox(height: 32),
-                    const Divider(),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Contact Information
-
-                  Text(
-                    'Contact Information',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  CustomTextField(
-                    controller: TextEditingController(text: user.fullName),
-                    label: 'Full Name',
-                    enabled: false,
-                    prefixIcon: Icons.person,
-                  ),
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    prefixIcon: Icons.email,
-                  ),
-                  const SizedBox(height: 16),
-
-                  CustomTextField(
-                    controller: _phoneController,
-                    label: 'Phone Number',
-                    prefixIcon: Icons.phone,
-                  ),
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CustomTextField(
-                          controller: _cityController,
-                          label: 'City',
-                          prefixIcon: Icons.location_city,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: CustomTextField(
-                          controller: _areaController,
-                          label: 'Area',
-                          prefixIcon: Icons.map,
-                        ),
-                      ),
-                    ],
-                  ),
-
+                  _buildHostHub(context),
                   const SizedBox(height: 32),
-
-
-
+                  _buildSectionTitle('Personal Information'),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(user),
                   const SizedBox(height: 32),
-                  const Divider(),
-                  const SizedBox(height: 24),
-
-                  // CNIC Verification
-                  Text(
-                    'Identity Verification',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Required for listing cars and renting',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  CustomTextField(
-                    controller:
-                        TextEditingController(text: user.cnic?.number ?? ''),
-                    label: 'CNIC Number',
-                    enabled: false,
-                    prefixIcon: Icons.badge,
-                    hint: 'e.g., 42201-1234567-1',
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildImageUploadCard(
-                          'Front Side',
-                          'cnic_front',
-                          _cnicFront,
-                          user.cnic?.frontImage,
-                          false,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildImageUploadCard(
-                          'Back Side',
-                          'cnic_back',
-                          _cnicBack,
-                          user.cnic?.backImage,
-                          false,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(user.cnic?.verificationStatus).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _getStatusColor(user.cnic?.verificationStatus).withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getStatusIcon(user.cnic?.verificationStatus),
-                          size: 20,
-                          color: _getStatusColor(user.cnic?.verificationStatus),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Status: ${user.cnic != null ? user.cnic!.verificationStatus.toUpperCase() : 'NOT SUBMITTED'}',
-                          style: TextStyle(
-                            color: _getStatusColor(user.cnic?.verificationStatus),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  _buildSectionTitle('Identity Verification'),
+                  const SizedBox(height: 16),
+                  _buildVerificationSection(user),
                   const SizedBox(height: 40),
-
                   CustomButton(
                     text: 'Save Changes',
                     onPressed: _saveProfile,
                     isLoading: _isSaving,
-                    icon: Icons.save_rounded,
+                    icon: Icons.check_circle_outline,
                   ),
-                  
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  _buildLogoutButton(context),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -494,122 +178,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Color _getStatusColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'verified':
-      case 'approved':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _getStatusIcon(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'verified':
-      case 'approved':
-        return Icons.check_circle;
-      case 'pending':
-        return Icons.hourglass_empty;
-      case 'rejected':
-        return Icons.error;
-      default:
-        return Icons.info;
-    }
-  }
-
-  Widget _buildImageUploadCard(String label, String type, File? file, String? existingUrl, [bool isEditable = true]) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: isEditable ? () => _showImagePickerOptions(type) : null,
-          child: Container(
-            height: 120,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-              image: file != null
-                  ? DecorationImage(image: FileImage(file), fit: BoxFit.cover)
-                  : (existingUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(existingUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null),
-            ),
-            child: file == null && existingUrl == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_a_photo, color: Colors.grey.shade400),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Upload',
-                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                      ),
-                    ],
-                  )
-                : (isEditable ? Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.edit, color: Colors.white),
-                    ),
-                  ) : null), // No edit icon if not editable
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showImagePickerOptions(String type) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildHeader(BuildContext context, dynamic user) {
+    return SliverAppBar(
+      expandedHeight: 280.0,
+      pinned: true,
+      elevation: 0,
+      backgroundColor: const Color(0xFF7C3AED),
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          fit: StackFit.expand,
           children: [
-            const Text(
-              'Select Image Source',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildOption(
-                  icon: Icons.camera_alt,
-                  label: 'Camera',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.camera, type);
-                  },
+            // Background Pattern/Image
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF7C3AED), Color(0xFF5B21B6)],
                 ),
-                _buildOption(
-                  icon: Icons.photo_library,
-                  label: 'Gallery',
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage(ImageSource.gallery, type);
-                  },
+              ),
+            ),
+            // Glassmorphism effect overlay
+            Positioned(
+              top: -50,
+              right: -50,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 60),
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: CircleAvatar(
+                        radius: 54,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : (user.profilePhoto != null
+                                ? NetworkImage(user.profilePhoto!)
+                                : null) as ImageProvider?,
+                        child: (_profileImage == null && user.profilePhoto == null)
+                            ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                            : null,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _pickImage(ImageSource.gallery, 'profile'),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 8)
+                          ],
+                        ),
+                        child: const Icon(Icons.camera_alt,
+                            size: 18, color: Color(0xFF7C3AED)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  user.fullName,
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    user.email,
+                    style: GoogleFonts.outfit(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -619,85 +288,352 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
+  Widget _buildReputationSection(dynamic user) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ReputationCard(
+            label: 'Host Rating',
+            rating: user.hostRating ?? 0.0,
+            count: user.hostReviewCount ?? 0,
+            color: const Color(0xFF7C3AED),
+            icon: Icons.verified_user_outlined,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: _ReputationCard(
+            label: 'Renter Rating',
+            rating: user.renterRating ?? 0.0,
+            count: user.renterReviewCount ?? 0,
+            color: const Color(0xFF0EA5E9),
+            icon: Icons.stars_rounded,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHostHub(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Host Hub'),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _HubButton(
+                icon: Icons.directions_car_filled_rounded,
+                label: 'My Cars',
+                color: const Color(0xFF7C3AED),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HubButton(
+                icon: Icons.inbox_rounded,
+                label: 'Requests',
+                color: const Color(0xFF059669),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HostBookingsScreen()),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoSection(dynamic user) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
+        ],
+      ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 32, color: Theme.of(context).primaryColor),
+          CustomTextField(
+            controller: _emailController,
+            label: 'Email Address',
+            prefixIcon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 20),
+          CustomTextField(
+            controller: _phoneController,
+            label: 'Phone Number',
+            prefixIcon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: CustomTextField(
+                  controller: _cityController,
+                  label: 'City',
+                  prefixIcon: Icons.location_city_outlined,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: CustomTextField(
+                  controller: _areaController,
+                  label: 'Area',
+                  prefixIcon: Icons.map_outlined,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuTile({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon,
-                  size: 22, color: Theme.of(context).primaryColor),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
+  Widget _buildVerificationSection(dynamic user) {
+    final status = user.cnic?.verificationStatus ?? 'not_submitted';
+    final color = _getStatusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('CNIC Verification',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.bold)),
                   Text(
-                    label,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                    '${user.cnic?.number ?? "Number not provided"}',
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                   ),
                 ],
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(
+                      color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _VerificationImageCard(
+                  label: 'Front Side',
+                  url: user.cnic?.frontImage,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _VerificationImageCard(
+                  label: 'Back Side',
+                  url: user.cnic?.backImage,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return Center(
+      child: TextButton.icon(
+        onPressed: () => _showLogoutDialog(context),
+        icon: const Icon(Icons.logout_rounded, color: Colors.red),
+        label: Text(
+          'Log out of RozRides',
+          style: GoogleFonts.outfit(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Logout', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to sign out from your account?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await context.read<AuthProvider>().signOut();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 15, color: Colors.grey.shade400),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.outfit(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Colors.black87,
+      ),
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'verified':
+      case 'approved': return const Color(0xFF10B981);
+      case 'pending':  return const Color(0xFFF59E0B);
+      case 'rejected': return const Color(0xFFEF4444);
+      default:         return Colors.grey;
+    }
+  }
+}
+
+class _ReputationCard extends StatelessWidget {
+  final String label;
+  final double rating;
+  final int count;
+  final Color color;
+  final IconData icon;
+
+  const _ReputationCard({
+    required this.label,
+    required this.rating,
+    required this.count,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 18),
+              const SizedBox(width: 4),
+              Text(rating.toStringAsFixed(1),
+                  style: GoogleFonts.outfit(
+                      fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text('$count reviews',
+              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HubButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _HubButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(label,
+                style: GoogleFonts.outfit(
+                    color: color, fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
       ),
@@ -705,45 +641,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ─── Rating Badge Widget ──────────────────────────────────────────────────────
-
-class _RatingBadge extends StatelessWidget {
+class _VerificationImageCard extends StatelessWidget {
   final String label;
-  final double rating;
-  final int count;
-  final Color color;
+  final String? url;
 
-  const _RatingBadge({
+  const _VerificationImageCard({
     required this.label,
-    required this.rating,
-    required this.count,
-    required this.color,
+    this.url,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 20),
-          const SizedBox(width: 4),
-          Text(rating.toStringAsFixed(1),
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        ]),
-        const SizedBox(height: 4),
-        Text(label,
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: color)),
-        Text('$count ${count == 1 ? "review" : "reviews"}',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-      ]),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 100,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+            image: url != null
+                ? DecorationImage(image: NetworkImage(url!), fit: BoxFit.cover)
+                : null,
+          ),
+          child: url == null
+              ? const Icon(Icons.image_not_supported_outlined, color: Colors.grey)
+              : null,
+        ),
+        const SizedBox(height: 6),
+        Center(
+            child: Text(label,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 11))),
+      ],
     );
   }
 }

@@ -8,6 +8,7 @@ class ListingModel {
 
   // Vehicle Details
   final String carName;
+  final String? carNumber;
   final String brand;
   final String model;
   final int year;
@@ -52,6 +53,7 @@ class ListingModel {
     required this.ownerName,
     required this.ownerPhone,
     required this.carName,
+    this.carNumber,
     required this.brand,
     required this.model,
     required this.year,
@@ -86,6 +88,7 @@ class ListingModel {
       ownerName: map['ownerName'] ?? '',
       ownerPhone: map['ownerPhone'] ?? '',
       carName: map['carName'] ?? '',
+      carNumber: map['carNumber'],
       brand: map['brand'] ?? '',
       model: map['model'] ?? '',
       year: map['year'] ?? 2020,
@@ -126,6 +129,7 @@ class ListingModel {
       'ownerName': ownerName,
       'ownerPhone': ownerPhone,
       'carName': carName,
+      'carNumber': carNumber,
       'brand': brand,
       'model': model,
       'year': year,

@@ -32,6 +32,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final TextEditingController _engineSizeController = TextEditingController();
   final TextEditingController _mileageController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _carNumberController = TextEditingController();
 
   // State
   String _fuelType = 'Petrol';
@@ -179,6 +180,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         ownerName: user.fullName,
         ownerPhone: user.phoneNumber,
         carName: _carNameController.text.trim(),
+        carNumber: _carNumberController.text.trim(),
         brand: _brandController.text.trim(),
         model: _modelController.text.trim(),
         year: int.parse(_yearController.text),
@@ -459,6 +461,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
             // Basic Information
             _buildSection(
               title: 'Basic Information',
+              icon: Icons.info_outline_rounded,
+              iconColor: Colors.blue,
               children: [
                 CustomTextField(
                   controller: _carNameController,
@@ -466,6 +470,14 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   hint: 'e.g., Toyota Corolla GLi 2020',
                   prefixIcon: Icons.title_rounded,
                   validator: (value) => value == null || value.isEmpty ? 'Please enter car title' : null,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: _carNumberController,
+                  label: 'Car Number (Private)',
+                  hint: 'e.g., LEC-1234',
+                  prefixIcon: Icons.numbers_rounded,
+                  validator: (value) => value == null || value.isEmpty ? 'Car number is required for admin' : null,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -535,6 +547,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
             // Specifications
             _buildSection(
               title: 'Specifications',
+              icon: Icons.settings_outlined,
+              iconColor: Colors.orange,
               children: [
                 CustomTextField(
                   controller: _engineSizeController,
@@ -595,6 +609,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
             // Pricing & Services
             _buildSection(
               title: 'Pricing & Services',
+              icon: Icons.payments_outlined,
+              iconColor: Colors.green,
               children: [
 
               // Price per Day
@@ -626,7 +642,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -653,6 +670,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     ),
                     Switch(
                       value: _withDriver,
+                      activeColor: const Color(0xFF7C3AED),
                       onChanged: _hasInsurance
                           ? (value) {
                         setState(() {
@@ -665,14 +683,14 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
               // Insurance Option Cards (Phase 2 requirement)
               const Text(
                 'Does your car have valid insurance?',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -752,12 +770,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
               if (!_hasInsurance)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
+                  padding: const EdgeInsets.only(top: 12.0),
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
                     ),
                     child: const Row(
                       children: [
@@ -766,7 +785,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         Expanded(
                           child: Text(
                             'Without insurance, driver must be included',
-                            style: TextStyle(fontSize: 12, color: Colors.orange),
+                            style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -780,6 +799,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
             // Description
             _buildSection(
               title: 'Description',
+              icon: Icons.description_outlined,
+              iconColor: Colors.deepPurple,
               children: [
 
               TextFormField(
@@ -787,8 +808,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
                 maxLines: 5,
                 decoration: InputDecoration(
                   hintText: 'Describe your car in detail (condition, features, special notes, etc.)',
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
                 validator: (value) {
@@ -808,6 +836,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
             // Location Picker
             _buildSection(
               title: 'Location',
+              icon: Icons.location_on_outlined,
+              iconColor: Colors.red,
               subtitle: 'Pin exactly where this car is available for pickup',
               children: [
                 InkWell(
@@ -863,25 +893,61 @@ class _AddListingScreenState extends State<AddListingScreen> {
     );
   }
 
-  Widget _buildSection({required String title, String? subtitle, required List<Widget> children}) {
+  Widget _buildSection({
+    required String title,
+    String? subtitle,
+    required List<Widget> children,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    final Color sectionColor = iconColor ?? const Color(0xFF7C3AED);
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: sectionColor.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: sectionColor.withValues(alpha: 0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-          ],
-          const SizedBox(height: 20),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: sectionColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: sectionColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: GoogleFonts.outfit(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.2)),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           ...children,
         ],
       ),

@@ -17,6 +17,7 @@ interface Listing {
     id: string;
     ownerName: string;
     carName: string;
+    carNumber?: string;
     brand: string;
     model: string;
     year: number;
@@ -234,6 +235,14 @@ export default function ListingsPage() {
                                     <p className="text-sm text-muted-foreground">Status</p>
                                     {getStatusBadge(selectedListing.status)}
                                 </div>
+                                {selectedListing.carNumber && (
+                                    <div className="col-span-full">
+                                        <p className="text-sm text-muted-foreground">Car Number (Private)</p>
+                                        <Badge variant="secondary" className="text-lg font-mono">
+                                            {selectedListing.carNumber}
+                                        </Badge>
+                                    </div>
+                                )}
                             </div>
                             {selectedListing.status === 'pending' && (
                                 <div className="flex gap-2 pt-4">
