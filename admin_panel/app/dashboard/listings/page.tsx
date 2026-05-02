@@ -83,12 +83,12 @@ export default function ListingsPage() {
     };
 
     const getStatusBadge = (status: string) => {
-        const variants: Record<string, any> = {
+        const variants: Record<string, "success" | "warning" | "destructive" | "default" | "outline"> = {
             approved: 'success',
             pending: 'warning',
             rejected: 'destructive',
         };
-        return <Badge variant={variants[status]}>{status.toUpperCase()}</Badge>;
+        return <Badge variant={variants[status] || 'outline'}>{status.toUpperCase()}</Badge>;
     };
 
     const filteredListings = listings.filter((listing) =>

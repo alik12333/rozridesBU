@@ -13,7 +13,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { db } from '@/lib/firebase-client';
-import { collection, onSnapshot, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 
 interface DamageClaim {
     claimId: string;

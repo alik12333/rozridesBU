@@ -73,7 +73,7 @@ export default async function ReviewsPage() {
                                     <TableRow>
                                         <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                                             <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
-                                            No flagged reviews. You're all caught up!
+                                            No flagged reviews. You&apos;re all caught up!
                                         </TableCell>
                                     </TableRow>
                                 ) : (

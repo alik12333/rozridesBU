@@ -7,8 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
+interface ActivityItem {
+    id: string;
+    status: string;
+    note: string;
+    timestamp: Date;
+}
+
 export default function RecentActivityFeed() {
-    const [activities, setActivities] = useState<any[]>([]);
+    const [activities, setActivities] = useState<ActivityItem[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

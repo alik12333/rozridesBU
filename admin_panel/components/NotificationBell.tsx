@@ -15,8 +15,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 
+interface Alert {
+    id: string;
+    title: string;
+    body: string;
+    type: string;
+}
+
 export default function NotificationBell() {
-    const [alerts, setAlerts] = useState<any[]>([]);
+    const [alerts, setAlerts] = useState<Alert[]>([]);
     const router = useRouter();
 
     useEffect(() => {
@@ -37,7 +44,7 @@ export default function NotificationBell() {
         return () => unsubscribe();
     }, []);
 
-    const handleAlertClick = async (alert: any) => {
+    const handleAlertClick = async (alert: Alert) => {
         // Mark as read
         try {
             await updateDoc(doc(db, 'adminAlerts', alert.id), {

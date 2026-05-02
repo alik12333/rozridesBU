@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, BadgeCheck, Car, LogOut, ShieldPlus, ClipboardList, AlertTriangle, Star } from 'lucide-react';
+import { LogOut, LayoutDashboard, Car, Users, Star, BadgeCheck, ClipboardList, AlertTriangle, ShieldPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useRoleGuard } from '@/lib/hooks/useRoleGuard';

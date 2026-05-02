@@ -84,12 +84,12 @@ export default function CNICPage() {
     };
 
     const getStatusBadge = (status: string) => {
-        const variants: Record<string, any> = {
+        const variants: Record<string, "success" | "warning" | "destructive" | "default"> = {
             approved: 'success',
             pending: 'warning',
             rejected: 'destructive',
         };
-        return <Badge variant={variants[status]}>{status.toUpperCase()}</Badge>;
+        return <Badge variant={variants[status] || 'default'}>{status.toUpperCase()}</Badge>;
     };
 
     if (loading) {
@@ -98,7 +98,8 @@ export default function CNICPage() {
 
     const pendingCNICs = cnicData.filter((c) => c.cnic.verificationStatus === 'pending');
     const approvedCNICs = cnicData.filter((c) => c.cnic.verificationStatus === 'approved');
-    const rejectedCNICs = cnicData.filter((c) => c.cnic.verificationStatus === 'rejected');
+    // rejectedCNICs defined but never used, so we omit it here unless needed for UI
+
 
     return (
         <div className="space-y-6">

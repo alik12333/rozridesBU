@@ -58,8 +58,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ message: 'Admin created successfully', uid: userRecord.uid });
 
-    } catch (error: any) {
-        console.error('Error creating admin:', error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    } catch (error: unknown) {
+        const err = error as Error;
+        console.error('Error creating admin:', err);
+        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
     }
 }

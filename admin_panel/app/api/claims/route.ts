@@ -22,7 +22,7 @@ export async function GET() {
                     if (renterSnap.exists) renterName = renterSnap.data()?.fullName ?? renterName;
                     const hostSnap = await adminDb.collection('users').doc(data.hostId).get();
                     if (hostSnap.exists) hostName = hostSnap.data()?.fullName ?? hostName;
-                } catch (_) {}
+                } catch { }
 
                 return {
                     id: doc.id,
@@ -48,8 +48,9 @@ export async function GET() {
         );
 
         return NextResponse.json(claims);
-    } catch (error) {
-        console.error('Error fetching claims:', error);
-        return NextResponse.json({ error: 'Failed to fetch claims' }, { status: 500 });
+    } catch (error: unknown) {
+        const err = error as Error;
+        console.error('Error creating admin:', err);
+        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
     }
 }

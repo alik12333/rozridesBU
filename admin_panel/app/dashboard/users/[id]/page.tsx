@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, UserMinus, ShieldAlert, Star, Car } from 'lucide-react';
+import { AlertTriangle, UserMinus, ShieldAlert, Star } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import Image from 'next/image';
 

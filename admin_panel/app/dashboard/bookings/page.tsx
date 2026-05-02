@@ -146,7 +146,7 @@ export default function BookingsPage() {
         if (status === 'rejected' || status === 'expired' || status === 'cancelled') variant = 'destructive';
         if (status === 'disputed') return <Badge className="bg-orange-500 hover:bg-orange-600 font-bold uppercase">{status}</Badge>;
 
-        return <Badge variant={variant as any} className="uppercase">{status}</Badge>;
+        return <Badge variant={variant as "success" | "warning" | "destructive" | "default" | "outline"} className="uppercase">{status}</Badge>;
     };
 
     const filteredBookings = bookings.filter((booking) =>
@@ -268,7 +268,7 @@ export default function BookingsPage() {
                                     </p>
                                 ) : (
                                     <div className="space-y-4">
-                                        {timeline.map((event, index) => (
+                                        {timeline.map((event) => (
                                             <div key={event.id} className="relative pl-6 pb-4 border-l-2 border-gray-200 dark:border-gray-700 last:border-0 last:pb-0">
                                                 <div className="absolute -left-1.5 top-1.5 w-3 h-3 bg-primary rounded-full" />
                                                 <div className="bg-white dark:bg-gray-800 border rounded-lg p-3 shadow-sm">

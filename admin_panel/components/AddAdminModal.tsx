@@ -57,8 +57,8 @@ export default function AddAdminModal({ onSuccess }: { onSuccess?: () => void })
                 if (onSuccess) onSuccess();
             }, 1500);
 
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.message });
+        } catch (error: unknown) {
+            setMessage({ type: 'error', text: error instanceof Error ? error.message : 'An unknown error occurred' });
         } finally {
             setLoading(false);
         }

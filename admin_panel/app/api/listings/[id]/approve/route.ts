@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateListingStatus, getAllListings } from '@/lib/firestore';
+import { updateListingStatus } from '@/lib/firestore';
 import { sendListingApprovalNotification } from '@/lib/fcm';
 import { adminDb } from '@/lib/firebase-admin';
 

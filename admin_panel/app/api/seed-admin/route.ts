@@ -15,8 +15,9 @@ export async function GET(req: NextRequest) {
         try {
             userRecord = await adminAuth.getUserByEmail(email);
             console.log('User already exists in Auth');
-        } catch (error: any) {
-            if (error.code === 'auth/user-not-found') {
+        } catch (error: unknown) {
+            const authError = error as { code: string };
+            if (authError.code === 'auth/user-not-found') {
                 userRecord = await adminAuth.createUser({
                     email,
                     password,
@@ -44,8 +45,9 @@ export async function GET(req: NextRequest) {
             email 
         });
 
-    } catch (error: any) {
-        console.error('Error seeding admin:', error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    } catch (error: unknown) {
+        const err = error as Error;
+        console.error('Error seeding admin:', err);
+        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
     }
 }

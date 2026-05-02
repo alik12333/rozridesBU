@@ -70,7 +70,7 @@ export default async function AdminsPage() {
                                     </TableRow>
                                 ) : (
                                     admins.map((user) => {
-                                        const roleLabel = user.roles?.isAdmin ? 'admin' : (user as any).role || 'admin';
+                                        const roleLabel = user.roles?.isAdmin ? 'admin' : (user as { role?: string }).role || 'admin';
                                         return (
                                             <TableRow key={user.id}>
                                                 <TableCell className="font-medium">{user.fullName || 'Admin User'}</TableCell>

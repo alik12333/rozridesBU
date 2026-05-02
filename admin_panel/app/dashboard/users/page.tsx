@@ -15,8 +15,8 @@ export const dynamic = 'force-dynamic';
 export default async function UsersPage() {
     const users = await getAllUsers();
 
-    const getStatusBadge = (status: string) => {
-        const variants: Record<string, any> = {
+    const getStatusBadge = (status: string): "success" | "secondary" | "destructive" | "default" => {
+        const variants: Record<string, "success" | "secondary" | "destructive" | "default"> = {
             active: 'success',
             inactive: 'secondary',
             suspended: 'destructive',
@@ -26,12 +26,12 @@ export default async function UsersPage() {
 
     const getCNICBadge = (status?: string) => {
         if (!status) return <Badge variant="secondary">No CNIC</Badge>;
-        const variants: Record<string, any> = {
+        const variants: Record<string, "success" | "warning" | "destructive" | "default"> = {
             approved: 'success',
             pending: 'warning',
             rejected: 'destructive',
         };
-        return <Badge variant={variants[status]}>{status.toUpperCase()}</Badge>;
+        return <Badge variant={variants[status] || 'default'}>{status.toUpperCase()}</Badge>;
     };
 
     return (
