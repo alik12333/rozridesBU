@@ -79,12 +79,16 @@ export default function LoginPage() {
             <Card className="w-full max-w-md shadow-2xl">
                 <CardHeader className="space-y-1 text-center">
                     <div className="flex justify-center mb-4">
-                        <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-                            <span className="text-3xl font-bold text-white">R</span>
+                        <div className="relative w-20 h-20 overflow-hidden rounded-full border-4 border-white shadow-xl">
+                            <img 
+                                src="/logo.png" 
+                                alt="RozRides Logo" 
+                                className="object-cover w-full h-full"
+                            />
                         </div>
                     </div>
-                    <CardTitle className="text-3xl font-bold">RozRides</CardTitle>
-                    <CardDescription className="text-lg">Admin Portal</CardDescription>
+                    <CardTitle className="text-3xl font-bold tracking-tight">RozRides</CardTitle>
+                    <CardDescription className="text-lg font-medium text-primary">Admin Portal</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-4">

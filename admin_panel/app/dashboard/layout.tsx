@@ -54,12 +54,16 @@ export default function DashboardLayout({
                 {/* Logo */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                            <span className="text-xl font-bold text-white">R</span>
+                        <div className="relative w-10 h-10 overflow-hidden rounded-full border border-gray-100 shadow-sm">
+                            <img 
+                                src="/logo.png" 
+                                alt="RozRides Logo" 
+                                className="object-cover w-full h-full"
+                            />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold">RozRides</h2>
-                            <p className="text-xs text-muted-foreground">Admin Panel</p>
+                            <h2 className="text-xl font-bold tracking-tight">RozRides</h2>
+                            <p className="text-[10px] uppercase font-bold text-primary tracking-widest opacity-80">Admin Panel</p>
                         </div>
                     </div>
                 </div>
