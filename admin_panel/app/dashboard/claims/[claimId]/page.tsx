@@ -128,6 +128,7 @@ export default function ClaimReviewPage() {
         });
 
         return () => unsub();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [claimId]);
 
     const handleResolveClick = (decision: 'host' | 'renter' | 'split' | 'extra') => {
@@ -253,6 +254,7 @@ export default function ClaimReviewPage() {
                         <p className="font-bold capitalize mb-2">{area.replace('_', ' ')}</p>
                         <div className="grid grid-cols-2 gap-2">
                             {item.photoUrls?.map((url, i) => (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img key={i} src={url} alt={area} className="w-full h-32 object-cover rounded cursor-pointer" onClick={() => window.open(url, '_blank')} />
                             ))}
                         </div>
