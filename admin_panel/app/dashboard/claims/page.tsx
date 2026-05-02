@@ -180,7 +180,7 @@ export default function ClaimsPage() {
                                             <span>{claim.carName}</span>
                                             {claim.description && (
                                                 <span className="text-[10px] text-muted-foreground italic line-clamp-1 max-w-[150px]">
-                                                    "{claim.description}"
+                                                    &quot;{claim.description}&quot;
                                                 </span>
                                             )}
                                         </div>

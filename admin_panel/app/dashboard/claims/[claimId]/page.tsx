@@ -364,7 +364,7 @@ export default function ClaimReviewPage() {
                 {claim.description && (
                     <div className="mb-6 p-4 bg-gray-50 border rounded-lg">
                         <p className="text-xs font-bold text-gray-500 uppercase mb-1">Host Description of Damage</p>
-                        <p className="text-sm text-gray-800 italic">"{claim.description}"</p>
+                        <p className="text-sm text-gray-800 italic">&quot;{claim.description}&quot;</p>
                     </div>
                 )}
 
