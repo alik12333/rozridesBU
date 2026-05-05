@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase-client';
 import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, Handshake, ArrowLeft, FileDown } from 'lucide-react';
+import { CheckCircle, XCircle, Handshake, ArrowLeft, FileDown, Sparkles, Loader2 } from 'lucide-react';
 
 interface ClaimData {
     claimId: string;
@@ -65,6 +65,9 @@ export default function ClaimReviewPage() {
     const [customSplit, setCustomSplit] = useState('');
     const [extraAmount, setExtraAmount] = useState('');
     const [processing, setProcessing] = useState<string | null>(null);
+
+    const [aiStatus, setAiStatus] = useState<'idle' | 'analyzing' | 'complete' | 'error'>('idle');
+    const [aiResult, setAiResult] = useState<{ recommendation: string, reasoning: string, suggestedSplitAmount?: number } | null>(null);
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -154,6 +157,44 @@ export default function ClaimReviewPage() {
             alert('Error downloading report');
         } finally {
             setProcessing(null);
+        }
+    };
+
+    const analyzeWithAI = async () => {
+        if (!claim) return;
+        setAiStatus('analyzing');
+        setAiResult(null);
+
+        try {
+            const res = await fetch(`/api/claims/${claim.claimId}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    claimDetails: {
+                        description: claim.description,
+                        hostClaimedAmount: claim.hostClaimedAmount,
+                        depositAmount: claim.depositAmount,
+                    },
+                    preTrip,
+                    postTrip,
+                    messages: messages.map(m => ({
+                        sender: m.senderId === claim.renterId ? 'Renter' : (m.senderId === claim.hostId ? 'Host' : 'System'),
+                        text: m.text,
+                        time: m.createdAt
+                    }))
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setAiResult(data);
+                setAiStatus('complete');
+            } else {
+                setAiStatus('error');
+            }
+        } catch (e) {
+            console.error(e);
+            setAiStatus('error');
         }
     };
 
@@ -310,7 +351,7 @@ export default function ClaimReviewPage() {
     const isResolved = claim.status === 'resolved';
 
     return (
-        <div className="flex flex-col h-[calc(100vh-100px)] overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-100px)] overflow-y-auto pb-6">
             <div className="flex items-center gap-4 mb-4 shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/claims')}>
                     <ArrowLeft className="w-5 h-5" />
@@ -348,7 +389,7 @@ export default function ClaimReviewPage() {
                 )}
             </div>
 
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[500px]">
                 {/* Column 1 */}
                 <div className="bg-gray-100 rounded-lg p-4 overflow-y-auto">
                     <h2 className="font-bold text-lg mb-4 sticky top-0 bg-gray-100 py-2 border-b z-10">AT PICKUP</h2>
@@ -389,8 +430,73 @@ export default function ClaimReviewPage() {
                 </div>
             </div>
 
+            {/* Bottom Panels Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 shrink-0">
+
+            {/* AI Recommendation Panel */}
+            <div className="h-full bg-gradient-to-r from-indigo-50 to-purple-50 border border-purple-200 rounded-lg p-5 flex flex-col">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-purple-100 text-purple-700 rounded-full">
+                            <Sparkles className="w-5 h-5" />
+                        </div>
+                        <h3 className="font-bold text-lg text-purple-900">Gemini AI Assistant</h3>
+                    </div>
+                    {aiStatus === 'idle' && (
+                        <Button 
+                            className="bg-purple-600 hover:bg-purple-700 text-white" 
+                            onClick={analyzeWithAI}
+                        >
+                            Analyze Claim with AI
+                        </Button>
+                    )}
+                </div>
+
+                {aiStatus === 'analyzing' && (
+                    <div className="mt-4 flex items-center justify-center gap-3 py-6">
+                        <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+                        <span className="text-purple-700 font-medium animate-pulse">
+                            Gemini is analyzing inspections, host notes, and chat history...
+                        </span>
+                    </div>
+                )}
+
+                {aiStatus === 'error' && (
+                    <div className="mt-4 bg-red-50 text-red-700 p-3 rounded border border-red-200">
+                        Failed to generate AI recommendation. Please try again or resolve manually.
+                        <Button variant="outline" size="sm" className="ml-4" onClick={analyzeWithAI}>Retry</Button>
+                    </div>
+                )}
+
+                {aiStatus === 'complete' && aiResult && (
+                    <div className="mt-4 bg-white rounded-lg p-4 border border-purple-100 shadow-sm">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-gray-500 uppercase mb-1">Reasoning</p>
+                                <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                    {aiResult.reasoning}
+                                </p>
+                            </div>
+                            <div className="w-1/3 bg-purple-50 rounded-md p-3 border border-purple-100 flex flex-col justify-center items-center text-center">
+                                <p className="text-xs font-bold text-gray-500 uppercase mb-1">Suggested Outcome</p>
+                                <div className="text-lg font-bold text-purple-900 uppercase">
+                                    {aiResult.recommendation === 'host' ? 'Side with Host' : 
+                                     aiResult.recommendation === 'renter' ? 'Side with Renter' : 
+                                     aiResult.recommendation === 'split' ? 'Split Deduction' : 'Extra Charge'}
+                                </div>
+                                {(aiResult.recommendation === 'split' || aiResult.recommendation === 'extra') && aiResult.suggestedSplitAmount && (
+                                    <div className="mt-2 text-sm font-bold bg-white px-3 py-1 rounded-full text-purple-700 border border-purple-200">
+                                        PKR {aiResult.suggestedSplitAmount.toLocaleString()}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* Resolution Panel */}
-            <div className="mt-4 shrink-0 bg-white border rounded-lg shadow-sm p-5">
+            <div className="h-full bg-white border rounded-lg shadow-sm p-5 flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-lg uppercase">Admin Resolution</h3>
                     <div className="bg-red-50 text-red-700 px-3 py-1 rounded font-bold border border-red-200">
@@ -497,6 +603,7 @@ export default function ClaimReviewPage() {
                         </div>
                     </div>
                 )}
+            </div>
             </div>
 
             {/* Custom Confirmation Dialog */}
