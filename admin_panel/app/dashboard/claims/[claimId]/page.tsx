@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase-client';
 import { doc, getDoc, updateDoc, collection, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, Handshake, ArrowLeft } from 'lucide-react';
+import { CheckCircle, XCircle, Handshake, ArrowLeft, FileDown } from 'lucide-react';
 
 interface ClaimData {
     claimId: string;
@@ -131,6 +131,31 @@ export default function ClaimReviewPage() {
         return () => unsub();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [claimId]);
+
+    const handleDownloadReport = async () => {
+        if (!claim) return;
+        setProcessing('report');
+        try {
+            const res = await fetch(`/api/bookings/${claim.bookingId}/report`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `RozRides_Report_${claim.bookingId.substring(0, 8)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                alert('Failed to generate report');
+            }
+        } catch (error) {
+            console.error('Error downloading report:', error);
+            alert('Error downloading report');
+        } finally {
+            setProcessing(null);
+        }
+    };
 
     const handleResolveClick = (decision: 'host' | 'renter' | 'split' | 'extra') => {
         if (!claim) return;
@@ -293,6 +318,18 @@ export default function ClaimReviewPage() {
                 <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-bold">Review Claim #{claim.claimId.slice(0,8)}</h1>
                     <p className="text-muted-foreground text-sm">Booking ID: {claim.bookingId}</p>
+                    {(claim.status === 'decided' || isResolved) && (
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                            onClick={handleDownloadReport}
+                            disabled={processing === 'report'}
+                        >
+                            <FileDown className="w-4 h-4 mr-2" />
+                            {processing === 'report' ? 'Generating...' : 'Download Report'}
+                        </Button>
+                    )}
                 </div>
                 {claim.status === 'decided' && (
                     <div className="ml-auto flex items-center gap-4 bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg">

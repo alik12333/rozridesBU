@@ -1,9 +1,20 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../main.dart'; // To access navigatorKey
+import '../models/booking_model.dart';
+import '../screens/booking/booking_detail_screen.dart';
+import '../screens/chat/chat_screen.dart';
+import '../screens/host/incoming_requests_screen.dart';
+import '../screens/my_listings_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/renter/my_bookings_screen.dart';
+import '../screens/reviews/submit_review_screen.dart';
+import '../screens/trip/active_trip_screen.dart';
 
 /// Singleton service that handles FCM token registration, permission requests,
 /// and foreground push notification display using flutter_local_notifications.
@@ -42,6 +53,17 @@ class NotificationService {
         android: androidInit,
         iOS: darwinInit,
       ),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) {
+          try {
+            final data = jsonDecode(payload) as Map<String, dynamic>;
+            _handleNotificationNavigation(data);
+          } catch (e) {
+            debugPrint('[NotifService] Payload parse error: $e');
+          }
+        }
+      },
     );
 
     // Android notification channel (required for Android 8+)
@@ -69,9 +91,17 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
 
     // ── 6. Handle notification taps (background / terminated) ─────────────
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      _handleNotificationNavigation(message.data);
+    });
+
     final initial = await _fcm.getInitialMessage();
-    if (initial != null) _handleNotificationTap(initial);
+    if (initial != null) {
+      // Small delay to ensure navigator is ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _handleNotificationNavigation(initial.data);
+      });
+    }
   }
 
   // ── Token management ────────────────────────────────────────────────────────
@@ -130,17 +160,118 @@ class NotificationService {
       notification.title,
       notification.body,
       details,
-      payload: message.data['bookingId'],
+      payload: jsonEncode(message.data),
     );
   }
 
-  // ── Tap handling ─────────────────────────────────────────────────────────────
+  // ── Tap handling & Navigation ────────────────────────────────────────────────
 
-  void _handleNotificationTap(RemoteMessage message) {
-    // TODO: Navigate to the booking detail screen using the bookingId in
-    // message.data['bookingId'] once a navigator key is set up.
-    debugPrint(
-        '[NotifService] Notification tapped: ${message.data}');
+  Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    final type = data['type'] as String?;
+    final bookingId = data['bookingId'] as String?;
+    final conversationId = data['conversationId'] as String?;
+
+    debugPrint('[NotifService] Navigating for type: $type');
+
+    switch (type) {
+      case 'new_booking_request':
+        _nav(const IncomingRequestsScreen());
+        break;
+
+      case 'booking_confirmed':
+      case 'booking_rejected':
+      case 'booking_cancelled':
+      case 'handover_complete':
+      case 'return_proposed':
+      case 'trip_completed':
+      case 'trip_flagged':
+      case 'dispute_decided':
+      case 'trip_auto_resolved':
+        if (bookingId != null) {
+          _nav(BookingDetailScreen(bookingId: bookingId));
+        }
+        break;
+
+      case 'booking_expired':
+        _nav(const MyBookingsScreen());
+        break;
+
+      case 'trip_started':
+        if (bookingId != null) {
+          _nav(ActiveTripScreen(bookingId: bookingId));
+        }
+        break;
+
+      case 'review_prompt':
+        if (bookingId != null) {
+          // Need full booking model for review screen
+          _showLoading();
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('bookings')
+                .doc(bookingId)
+                .get();
+            _hideLoading();
+            if (doc.exists) {
+              final booking = BookingModel.fromMap(doc.data()!, doc.id);
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              final isRenter = uid == booking.renterId;
+              _nav(SubmitReviewScreen(
+                booking: booking,
+                reviewType: isRenter ? 'renter_to_host' : 'host_to_renter',
+              ));
+            }
+          } catch (e) {
+            _hideLoading();
+          }
+        }
+        break;
+
+      case 'new_message':
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (conversationId != null && uid != null) {
+          _nav(ChatScreen(conversationId: conversationId, currentUserId: uid));
+        }
+        break;
+
+      case 'CNIC_verification_pending':
+        _nav(const ProfileScreen());
+        break;
+
+      case 'listing_pending':
+        _nav(const MyListingsScreen());
+        break;
+
+      default:
+        debugPrint('[NotifService] Unknown notification type: $type');
+    }
+  }
+
+  void _nav(Widget screen) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+  }
+
+  void _showLoading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  void _hideLoading() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
   }
 }
 

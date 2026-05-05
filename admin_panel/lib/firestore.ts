@@ -102,7 +102,20 @@ export async function banUser(userId: string): Promise<void> {
             status: 'banned',
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        
+
+        // Deactivate all conversations where the banned user is a participant
+        const convs = await adminDb.collection('conversations')
+            .where('participants', 'array-contains', userId)
+            .get();
+
+        if (convs.docs.length > 0) {
+            const batch = adminDb.batch();
+            convs.docs.forEach(doc => {
+                batch.update(doc.ref, { isActive: false });
+            });
+            await batch.commit();
+        }
+
         await addNotification(userId, {
             title: 'Account Banned',
             message: 'Your account has been banned due to multiple policy violations.',
@@ -113,7 +126,6 @@ export async function banUser(userId: string): Promise<void> {
         throw error;
     }
 }
-
 // Fetch all admins
 export async function getAdmins(): Promise<User[]> {
     try {

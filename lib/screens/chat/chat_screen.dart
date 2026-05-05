@@ -95,150 +95,169 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_conversation == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
-      );
-    }
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))),
+          );
+        }
+        
+        final doc = snap.data!;
+        if (!doc.exists) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Chat')),
+            body: const Center(child: Text('Conversation not found.')),
+          );
+        }
 
-    final otherName = _conversation!.otherPartyNameFor(widget.currentUserId);
-    final otherPhoto = _conversation!.otherPartyPhotoFor(widget.currentUserId);
+        _conversation = ConversationModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+        _isHost = widget.currentUserId == _conversation!.hostId;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        surfaceTintColor: Colors.white,
-        titleSpacing: 0,
-        leading: const BackButton(color: Colors.black),
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
-              backgroundImage: (otherPhoto != null && otherPhoto.isNotEmpty)
-                  ? NetworkImage(otherPhoto)
-                  : null,
-              child: (otherPhoto == null || otherPhoto.isEmpty)
-                  ? Text(
-                      otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                      style: GoogleFonts.outfit(
-                        color: const Color(0xFF7C3AED),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    otherName,
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black87,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    _conversation!.carName,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF7C3AED),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline_rounded, color: Colors.grey),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: StreamBuilder<List<MessageModel>>(
-                  stream: _chatService.getMessages(widget.conversationId),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text('Error loading messages: ${snapshot.error}',
-                            style: const TextStyle(color: Colors.red)),
-                      );
-                    }
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)));
-                    }
-                    
-                    final messages = snapshot.data ?? [];
-                    
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (_scrollCtrl.hasClients) {
-                        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-                      }
-                    });
+        final otherName = _conversation!.otherPartyNameFor(widget.currentUserId);
+        final otherPhoto = _conversation!.otherPartyPhotoFor(widget.currentUserId);
 
-                    if (messages.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade300),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Start your conversation with $otherName',
-                              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.fromLTRB(16, 80, 16, 100), // Extra top padding for floating status
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        if (msg.isSystem) {
-                          return _SystemMessageBubble(message: msg);
-                        }
-                        final isMe = msg.senderId == widget.currentUserId;
-                        return _ChatBubble(message: msg, isMe: isMe);
-                      },
-                    );
-                  },
+        return Scaffold(
+          backgroundColor: const Color(0xFFF7F8FC),
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 0,
+            surfaceTintColor: Colors.white,
+            titleSpacing: 0,
+            leading: const BackButton(color: Colors.black),
+            title: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                  backgroundImage: (otherPhoto != null && otherPhoto.isNotEmpty)
+                      ? NetworkImage(otherPhoto)
+                      : null,
+                  child: (otherPhoto == null || otherPhoto.isEmpty)
+                      ? Text(
+                          otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
+                          style: GoogleFonts.outfit(
+                            color: const Color(0xFF7C3AED),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        )
+                      : null,
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        otherName,
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        _conversation!.carName,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF7C3AED),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.info_outline_rounded, color: Colors.grey),
+                onPressed: () {},
               ),
-              
-              // Input Area (Always active)
-              _buildInputArea(),
+              const SizedBox(width: 8),
             ],
           ),
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: StreamBuilder<List<MessageModel>>(
+                      stream: _chatService.getMessages(widget.conversationId),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error loading messages: ${snapshot.error}',
+                                style: const TextStyle(color: Colors.red)),
+                          );
+                        }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)));
+                        }
+                        
+                        final messages = snapshot.data ?? [];
+                        
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollCtrl.hasClients) {
+                            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+                          }
+                        });
 
-          // Floating Status Pill
-          _buildFloatingStatus(),
-        ],
-      ),
+                        if (messages.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade300),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Start your conversation with $otherName',
+                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          controller: _scrollCtrl,
+                          padding: const EdgeInsets.fromLTRB(16, 80, 16, 100), // Extra top padding for floating status
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = messages[index];
+                            if (msg.isSystem) {
+                              return _SystemMessageBubble(message: msg);
+                            }
+                            final isMe = msg.senderId == widget.currentUserId;
+                            return _ChatBubble(message: msg, isMe: isMe);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  // Input Area
+                  _buildInputArea(),
+                ],
+              ),
+
+              // Floating Status Pill
+              _buildFloatingStatus(),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -303,6 +322,31 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final bool isActive = _conversation?.isActive ?? true;
+
+    if (!isActive) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(16, 20, 16, MediaQuery.of(context).padding.bottom + 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_rounded, color: Colors.grey.shade400, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              'This conversation is locked because the listing was deleted or an account was banned.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.4),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
       decoration: const BoxDecoration(

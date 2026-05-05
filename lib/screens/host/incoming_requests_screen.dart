@@ -87,16 +87,20 @@ class _IncomingRequestsScreenState extends State<IncomingRequestsScreen> {
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                     ),
                     const SizedBox(height: 16),
-                    ...reasons.map((r) => RadioListTile<String>(
+                    RadioGroup<String>(
+                      groupValue: selectedReason,
+                      onChanged: (v) => setSheetState(() => selectedReason = v),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: reasons.map((r) => RadioListTile<String>(
                           title: Text(r, style: const TextStyle(fontSize: 15)),
                           value: r,
-                          groupValue: selectedReason,
                           activeColor: const Color(0xFF7C3AED),
-                          onChanged: (v) =>
-                              setSheetState(() => selectedReason = v),
                           contentPadding: EdgeInsets.zero,
                           dense: true,
-                        )),
+                        )).toList(),
+                      ),
+                    ),
                     if (isOther) ...[
                       const SizedBox(height: 8),
                       TextField(

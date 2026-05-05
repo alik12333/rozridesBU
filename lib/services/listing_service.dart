@@ -98,7 +98,7 @@ class ListingService {
           .add({
         'title': 'Listing Verification In Process',
         'message': 'Your listing for $year $brand $model is under review. We\'ll notify you once it\'s approved.',
-        'type': 'info',
+        'type': 'listing_pending',
         'isUnread': true,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -170,6 +170,20 @@ class ListingService {
         await item.delete();
       }
 
+      // Deactivate associated conversations
+      final convs = await _firestore
+          .collection('conversations')
+          .where('carId', isEqualTo: listingId)
+          .get();
+      
+      if (convs.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (var doc in convs.docs) {
+          batch.update(doc.reference, {'isActive': false});
+        }
+        await batch.commit();
+      }
+
       // Delete document
       await _firestore.collection('listings').doc(listingId).delete();
     } catch (e) {
@@ -183,6 +197,22 @@ class ListingService {
       'status': status,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // If listing is marked inactive, deactivate associated conversations
+    if (status == 'inactive') {
+      final convs = await _firestore
+          .collection('conversations')
+          .where('carId', isEqualTo: listingId)
+          .get();
+      
+      if (convs.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (var doc in convs.docs) {
+          batch.update(doc.reference, {'isActive': false});
+        }
+        await batch.commit();
+      }
+    }
   }
 
   /// Migrate an existing listing that has flat location/geohash fields

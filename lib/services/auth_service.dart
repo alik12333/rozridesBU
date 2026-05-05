@@ -78,7 +78,7 @@ class AuthService {
           .add({
         'title': 'Verification Pending',
         'message': 'Your CNIC verification is under review. We\'ll notify you once it\'s approved.',
-        'type': 'info',
+        'type': 'CNIC_verification_pending',
         'isUnread': true,
         'createdAt': FieldValue.serverTimestamp(),
       });

@@ -5,11 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../models/booking_model.dart';
 import '../../models/damage_claim_model.dart';
 import '../../models/post_inspection_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
+import '../../services/report_service.dart';
 import '../../utils/booking_status_utils.dart';
 import '../renter/my_bookings_screen.dart';
 import '../trip/active_trip_screen.dart';
@@ -34,6 +38,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Map<String, dynamic>? _otherPartyData;
   Timer? _timer;
   bool _isConfirming = false;
+  bool _isGeneratingReport = false;
 
   @override
   void initState() {
@@ -48,6 +53,55 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _downloadTripReport(String bookingId) async {
+    setState(() => _isGeneratingReport = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final reportService = ReportService();
+      final pdfBytes = await reportService.generateTripReport(bookingId);
+      
+      final directory = Platform.isAndroid 
+          ? await getExternalStorageDirectory() 
+          : await getApplicationDocumentsDirectory();
+          
+      if (directory == null) throw Exception('Could not access storage directory');
+      
+      final filePath = '${directory.path}/RozRides_Report_${bookingId.substring(0, 8)}.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(pdfBytes);
+
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: const Text('Report downloaded to Files!'),
+          backgroundColor: const Color(0xFF16A34A),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'OPEN',
+            textColor: Colors.white,
+            onPressed: () async {
+              final result = await OpenFile.open(filePath);
+              if (result.type != ResultType.done && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Could not open file: ${result.message}'),
+                  backgroundColor: Colors.red,
+                ));
+              }
+            },
+          ),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Could not generate report. Please try again.'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isGeneratingReport = false);
+    }
   }
 
   Future<void> _loadOtherParty(String uid) async {
@@ -466,14 +520,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       }
 
       // ── completed: host review button ────────────────────────────────────
-      if (booking.status == 'completed' &&
-          booking.reviewStatus['hostSubmitted'] != true) {
+      if (booking.status == 'completed') {
+        if (booking.reviewStatus['hostSubmitted'] != true) {
+          buttons.add(_actionBtn(
+            label: 'Review Renter ⭐',
+            color: const Color(0xFF7C3AED),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => SubmitReviewScreen(booking: booking, reviewType: 'host_to_renter'),
+            )),
+          ));
+        }
+
         buttons.add(_actionBtn(
-          label: 'Review Renter ⭐',
-          color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => SubmitReviewScreen(booking: booking, reviewType: 'host_to_renter'),
-          )),
+          label: _isGeneratingReport ? 'Generating Report...' : 'Download Trip Report 📄',
+          color: Colors.blueGrey.shade700,
+          onPressed: _isGeneratingReport ? null : () => _downloadTripReport(booking.id),
         ));
       }
     } else {

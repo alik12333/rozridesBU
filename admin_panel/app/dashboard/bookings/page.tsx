@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, ShieldAlert, XCircle } from 'lucide-react';
+import { Eye, ShieldAlert, XCircle, FileDown } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -138,6 +138,30 @@ export default function BookingsPage() {
         }
     };
 
+    const handleDownloadReport = async (bookingId: string) => {
+        setProcessing('report');
+        try {
+            const res = await fetch(`/api/bookings/${bookingId}/report`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `RozRides_Report_${bookingId.substring(0, 8)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } else {
+                alert('Failed to generate report');
+            }
+        } catch (error) {
+            console.error('Error downloading report:', error);
+            alert('Error downloading report');
+        } finally {
+            setProcessing(null);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         let variant: 'default' | 'success' | 'destructive' | 'warning' | 'outline' = 'outline';
         
@@ -257,6 +281,20 @@ export default function BookingsPage() {
                                     <div className="mt-1">{getStatusBadge(selectedBooking.status)}</div>
                                 </div>
                             </div>
+
+                            {selectedBooking.status === 'completed' && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        variant="outline"
+                                        className="bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700"
+                                        onClick={() => handleDownloadReport(selectedBooking.id)}
+                                        disabled={processing !== null}
+                                    >
+                                        <FileDown className="w-4 h-4 mr-2" />
+                                        {processing === 'report' ? 'Generating...' : 'Download Trip Report'}
+                                    </Button>
+                                </div>
+                            )}
 
                             {/* Timeline Feed */}
                             <div>

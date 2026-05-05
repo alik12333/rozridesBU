@@ -13,6 +13,8 @@ import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/notification_service.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -42,6 +44,7 @@ class RozRidesApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'RozRides',
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         // The splash plays once. Its nextScreen is the AuthWrapper which

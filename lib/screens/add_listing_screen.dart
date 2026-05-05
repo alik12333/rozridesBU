@@ -431,7 +431,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           const Text('Fuel Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _fuelType,
+                            initialValue: _fuelType,
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey.shade50,
@@ -453,7 +453,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                           const Text('Transmission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _transmission,
+                            initialValue: _transmission,
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.grey.shade50,
@@ -519,7 +519,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
                       ),
                       Switch(
                         value: _withDriver,
-                        activeColor: const Color(0xFF7C3AED),
+                        activeTrackColor: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                        activeThumbColor: const Color(0xFF7C3AED),
                         onChanged: _hasInsurance ? (value) => setState(() => _withDriver = value) : null,
                       ),
                     ],

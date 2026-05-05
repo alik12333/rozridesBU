@@ -226,25 +226,27 @@ class _CancellationScreenState extends State<CancellationScreen> {
                       blurRadius: 12)
                 ],
               ),
-              child: Column(
-                children: reasons.map((r) {
-                  final isLast = r == reasons.last;
-                  return Column(
-                    children: [
-                      RadioListTile<String>(
-                        title: Text(r, style: const TextStyle(fontSize: 15)),
-                        value: r,
-                        groupValue: _selectedReason,
-                        activeColor: const Color(0xFF7C3AED),
-                        onChanged: (v) => setState(() => _selectedReason = v),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        dense: true,
-                      ),
-                      if (!isLast)
-                        Divider(height: 1, indent: 52, color: Colors.grey.shade100),
-                    ],
-                  );
-                }).toList(),
+              child: RadioGroup<String>(
+                groupValue: _selectedReason,
+                onChanged: (v) => setState(() => _selectedReason = v),
+                child: Column(
+                  children: reasons.map((r) {
+                    final isLast = r == reasons.last;
+                    return Column(
+                      children: [
+                        RadioListTile<String>(
+                          title: Text(r, style: const TextStyle(fontSize: 15)),
+                          value: r,
+                          activeColor: const Color(0xFF7C3AED),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          dense: true,
+                        ),
+                        if (!isLast)
+                          Divider(height: 1, indent: 52, color: Colors.grey.shade100),
+                      ],
+                    );
+                  }).toList(),
+                ),
               ),
             ),
             if (_selectedReason == 'Other') ...[
