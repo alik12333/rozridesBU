@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Eye } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, Trash2 } from 'lucide-react';
 import Image from 'next/image';
+import { useRoleGuard } from '@/lib/hooks/useRoleGuard';
 import {
     Dialog,
     DialogContent,
@@ -30,6 +31,7 @@ interface Listing {
 }
 
 export default function ListingsPage() {
+    const { isSuperAdmin, user } = useRoleGuard();
     const [listings, setListings] = useState<Listing[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -77,6 +79,37 @@ export default function ListingsPage() {
             }
         } catch (error) {
             console.error('Error rejecting listing:', error);
+        } finally {
+            setProcessing(null);
+        }
+    };
+
+    const handleDelete = async (listingId: string) => {
+        if (!confirm('Are you absolutely sure you want to PERMANENTLY delete this car from Firebase? This cannot be undone.')) return;
+
+        setProcessing(listingId);
+        try {
+            const res = await fetch('/api/admin/delete-resource', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    resourceId: listingId,
+                    resourceType: 'car',
+                    adminId: user?.uid
+                })
+            });
+
+            if (res.ok) {
+                await fetchListings();
+                setSelectedListing(null);
+                alert('Car deleted successfully.');
+            } else {
+                const data = await res.json();
+                alert(`Delete failed: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error deleting listing:', error);
+            alert('A network error occurred while deleting.');
         } finally {
             setProcessing(null);
         }
@@ -179,6 +212,17 @@ export default function ListingsPage() {
                                         <Eye className="w-4 h-4 mr-1" />
                                         View
                                     </Button>
+                                    {isSuperAdmin && (
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() => handleDelete(listing.id)}
+                                            disabled={processing === listing.id}
+                                            title="Delete permanently"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                     {listing.status === 'pending' && (
                                         <>
                                             <Button

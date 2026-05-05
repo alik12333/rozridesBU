@@ -10,6 +10,7 @@ class BookingModel {
   final String carName;
   final String carPhoto;
   final String carLocation;
+  final GeoPoint? location;
 
   // Trip dates
   final DateTime startDate;
@@ -65,6 +66,7 @@ class BookingModel {
     required this.carName,
     required this.carPhoto,
     required this.carLocation,
+    this.location,
     required this.startDate,
     required this.endDate,
     required this.totalDays,
@@ -139,6 +141,7 @@ class BookingModel {
         carName: map['carName'] ?? '',
         carPhoto: map['carPhoto'] ?? '',
         carLocation: map['carLocation'] ?? '',
+        location: map['location'] as GeoPoint?,
         startDate: (map['startDate'] is Timestamp) ? (map['startDate'] as Timestamp).toDate() : DateTime.now(),
         endDate: (map['endDate'] is Timestamp) ? (map['endDate'] as Timestamp).toDate() : DateTime.now(),
         totalDays: map['totalDays'] ?? 0,
@@ -185,6 +188,7 @@ class BookingModel {
       'carName': carName,
       'carPhoto': carPhoto,
       'carLocation': carLocation,
+      'location': location,
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
       'totalDays': totalDays,
@@ -220,6 +224,7 @@ class BookingModel {
     DateTime? updatedAt,
     DateTime? tripStartedAt,
     DateTime? tripEndedAt,
+    GeoPoint? location,
     Map<String, dynamic>? cashPayments,
     Map<String, dynamic>? reviewStatus,
     bool? preHandoverCompleted,
@@ -234,6 +239,7 @@ class BookingModel {
       carName: carName,
       carPhoto: carPhoto,
       carLocation: carLocation,
+      location: location ?? this.location,
       startDate: startDate,
       endDate: endDate,
       totalDays: totalDays,

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, ShieldAlert, XCircle, FileDown } from 'lucide-react';
+import { Eye, ShieldAlert, XCircle, FileDown, Trash2 } from 'lucide-react';
+import { useRoleGuard } from '@/lib/hooks/useRoleGuard';
 import {
     Dialog,
     DialogContent,
@@ -41,7 +42,8 @@ interface Booking {
 }
 
 export default function BookingsPage() {
-    const [bookings, setBookings] = [...useState<Booking[]>([])];
+    const { isSuperAdmin, user } = useRoleGuard();
+    const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
     const [timeline, setTimeline] = useState<BookingTimelineEvent[]>([]);
@@ -137,30 +139,57 @@ export default function BookingsPage() {
             setProcessing(null);
         }
     };
-
-    const handleDownloadReport = async (bookingId: string) => {
-        setProcessing('report');
-        try {
-            const res = await fetch(`/api/bookings/${bookingId}/report`);
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `RozRides_Report_${bookingId.substring(0, 8)}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } else {
-                alert('Failed to generate report');
-            }
-        } catch (error) {
-            console.error('Error downloading report:', error);
-            alert('Error downloading report');
-        } finally {
-            setProcessing(null);
+const handleDownloadReport = async (bookingId: string) => {
+    setProcessing('report');
+    try {
+        const res = await fetch(`/api/bookings/${bookingId}/report`);
+        if (res.ok) {
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RozRides_Report_${bookingId.substring(0, 8)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         }
-    };
+    } catch (error) {
+        console.error('Error downloading report:', error);
+    } finally {
+        setProcessing(null);
+    }
+};
+
+const handleDelete = async (bookingId: string) => {
+    if (!confirm('Are you absolutely sure you want to PERMANENTLY delete this booking from Firebase? This cannot be undone.')) return;
+
+    setProcessing('delete');
+    try {
+        const res = await fetch('/api/admin/delete-resource', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resourceId: bookingId,
+                resourceType: 'booking',
+                adminId: user?.uid
+            })
+        });
+
+        if (res.ok) {
+            await fetchBookings();
+            setSelectedBooking(null);
+            alert('Booking deleted successfully.');
+        } else {
+            const data = await res.json();
+            alert(`Delete failed: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('A network error occurred while deleting.');
+    } finally {
+        setProcessing(null);
+    }
+};
 
     const getStatusBadge = (status: string) => {
         let variant: 'default' | 'success' | 'destructive' | 'warning' | 'outline' = 'outline';
@@ -237,7 +266,7 @@ export default function BookingsPage() {
                                     </TableCell>
                                     <TableCell className="font-bold">Rs. {booking.totalAmount}</TableCell>
                                     <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right flex justify-end gap-2">
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -246,6 +275,17 @@ export default function BookingsPage() {
                                             <Eye className="w-4 h-4 mr-2" />
                                             Audit
                                         </Button>
+                                        {isSuperAdmin && (
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => handleDelete(booking.id)}
+                                                disabled={processing === 'delete'}
+                                                title="Delete permanently"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))

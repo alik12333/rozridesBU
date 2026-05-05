@@ -69,7 +69,7 @@ service cloud.firestore {
                       'bookedDateRanges', 'warningNotificationSent',
                       'tripStartedAt', 'tripEndedAt', 'cashPayments',
                       'preHandoverCompleted', 'postHandoverCompleted', 
-                      'proposedSettlement'])
+                      'proposedSettlement', 'cancellationReason'])
         ) ||
         // Review status updates (either party submitting review)
         (

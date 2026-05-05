@@ -201,9 +201,9 @@ class _CancellationScreenState extends State<CancellationScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Since all payments are cash, there is no automatic refund. '
-                      'If you have already exchanged any cash with the host, '
-                      'contact them directly to arrange its return.',
+                      widget.cancelledBy == 'renter'
+                          ? 'Since all payments are cash, there is no automatic refund. If you have already exchanged any cash with the host, contact them directly to arrange its return.'
+                          : 'Since all payments are cash, there is no automatic refund. If you have already collected any cash from the renter, contact them directly to arrange its return.',
                       style: TextStyle(color: Colors.blue.shade800, fontSize: 13, height: 1.5),
                     ),
                   ),

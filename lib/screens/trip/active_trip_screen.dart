@@ -24,6 +24,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   Timer? _timer;
   PreTripInspection? _inspection;
   Map<String, dynamic>? _listingData;
+  bool _isLoadingInspection = false;
 
   @override
   void initState() {
@@ -41,29 +42,37 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   Future<void> _navigateToReturn(BuildContext context, BookingModel booking) async {
-    final snack = ScaffoldMessenger.of(context);
-    snack.showSnackBar(const SnackBar(
-      content: Text('Loading inspection data…'),
-      duration: Duration(seconds: 2),
-    ));
-    final pre = await _service.fetchPreTripInspection(booking.id);
-    if (!context.mounted) return;
-    if (pre == null) {
-      snack.showSnackBar(const SnackBar(
-        content: Text('Pre-trip inspection not found.'),
-        backgroundColor: Colors.red,
-      ));
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PostTripInspectionScreen(
-          booking: booking,
-          preInspection: pre,
+    setState(() => _isLoadingInspection = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final pre = await _service.fetchPreTripInspection(booking.id);
+      if (!mounted) return;
+      if (pre == null) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Pre-trip inspection not found.'),
+          backgroundColor: Colors.red,
+        ));
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PostTripInspectionScreen(
+            booking: booking,
+            preInspection: pre,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Error loading inspection: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingInspection = false);
+    }
   }
 
   Future<void> _loadInspection() async {
@@ -635,10 +644,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton.icon(
-              icon: const Icon(Icons.assignment_return_outlined),
-              label: const Text('Complete Return',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              onPressed: () => _navigateToReturn(context, booking),
+              icon: _isLoadingInspection 
+                ? const SizedBox.shrink() 
+                : const Icon(Icons.assignment_return_outlined),
+              label: _isLoadingInspection
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Complete Return', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              onPressed: _isLoadingInspection ? null : () => _navigateToReturn(context, booking),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,

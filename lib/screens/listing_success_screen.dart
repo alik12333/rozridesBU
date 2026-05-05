@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'main_navigation.dart';
+import 'home_screen.dart';
+import 'my_listings_screen.dart';
 
 class ListingSuccessScreen extends StatelessWidget {
   const ListingSuccessScreen({super.key});
@@ -91,13 +92,13 @@ class ListingSuccessScreen extends StatelessWidget {
                 height: 56,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Navigate to main navigation and switch to My Cars tab (index 1)
+                    // Navigate to My Listings screen
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MainNavigation(initialIndex: 1),
+                        builder: (context) => const MyListingsScreen(),
                       ),
-                      (route) => false,
+                      (route) => route.isFirst,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -127,7 +128,7 @@ class ListingSuccessScreen extends StatelessWidget {
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MainNavigation(initialIndex: 0),
+                        builder: (context) => const HomeScreen(),
                       ),
                       (route) => false,
                     );

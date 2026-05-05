@@ -94,27 +94,29 @@ export default function LoginPage() {
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email or Username</Label>
+                            <Label htmlFor="email">Administrative Identity</Label>
                             <Input
                                 id="email"
                                 type="text"
-                                placeholder="admin or admin@rozrides.com"
+                                placeholder="Username or @rozrides.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 disabled={loading}
+                                className="bg-white/50 border-purple-100 focus:border-purple-300 focus:ring-purple-200"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">Security Key</Label>
                             <Input
                                 id="password"
                                 type="password"
-                                placeholder="Enter your password"
+                                placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 disabled={loading}
+                                className="bg-white/50 border-purple-100 focus:border-purple-300 focus:ring-purple-200"
                             />
                         </div>
                         {error && (

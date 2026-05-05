@@ -15,6 +15,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/booking_service.dart';
 import '../../services/report_service.dart';
 import '../../utils/booking_status_utils.dart';
+import '../car_location_map_screen.dart';
 import '../renter/my_bookings_screen.dart';
 import '../trip/active_trip_screen.dart';
 import '../trip/cash_settlement_screen.dart';
@@ -39,6 +40,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Timer? _timer;
   bool _isConfirming = false;
   bool _isGeneratingReport = false;
+  bool _isLoadingInspection = false;
+  bool _isStartingTrip = false;
 
   @override
   void initState() {
@@ -113,29 +116,37 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Future<void> _navigateToReturn(BuildContext context, BookingModel booking) async {
-    final snack = ScaffoldMessenger.of(context);
-    snack.showSnackBar(const SnackBar(
-      content: Text('Loading inspection data…'),
-      duration: Duration(seconds: 2),
-    ));
-    final pre = await _service.fetchPreTripInspection(booking.id);
-    if (!context.mounted) return;
-    if (pre == null) {
-      snack.showSnackBar(const SnackBar(
-        content: Text('Pre-trip inspection not found. Cannot start return.'),
-        backgroundColor: Colors.red,
-      ));
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PostTripInspectionScreen(
-          booking: booking,
-          preInspection: pre,
+    setState(() => _isLoadingInspection = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final pre = await _service.fetchPreTripInspection(booking.id);
+      if (!mounted) return;
+      if (pre == null) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Pre-trip inspection not found. Cannot start return.'),
+          backgroundColor: Colors.red,
+        ));
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PostTripInspectionScreen(
+            booking: booking,
+            preInspection: pre,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Error loading inspection: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingInspection = false);
+    }
   }
 
   String _fmt(DateTime d) => DateFormat('MMM d, yyyy').format(d);
@@ -247,6 +258,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                         ],
                       )),
                     ]),
+                    if ((booking.status == 'confirmed' || booking.status == 'active') && !isHost && booking.location != null) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => CarLocationMapScreen(
+                              booking: booking,
+                              showPin: true,
+                            ),
+                          )),
+                          icon: const Icon(Icons.map_rounded, size: 18),
+                          label: const Text('TRACK CAR LOCATION'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF7C3AED),
+                            side: const BorderSide(color: Color(0xFF7C3AED)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 )),
                 const SizedBox(height: 12),
@@ -492,6 +525,17 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 : null,
           ));
         }
+        
+        // Host can also cancel confirmed booking, but ONLY before handover is completed
+        if (!booking.preHandoverCompleted) {
+          buttons.add(_actionBtn(
+            label: 'Cancel Booking',
+            color: Colors.red.shade600,
+            outlined: true,
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => CancellationScreen(bookingId: booking.id, cancelledBy: 'host'))),
+          ));
+        }
       }
 
       // ── active: view trip OR complete return OR waiting for renter ──────
@@ -514,7 +558,29 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           buttons.add(_actionBtn(
             label: 'Complete Return',
             color: Colors.blue.shade700,
-            onPressed: () => _navigateToReturn(context, booking),
+            isLoading: _isLoadingInspection,
+            onPressed: () async {
+              // Early return confirmation
+              if (DateTime.now().isBefore(booking.endDate)) {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Early Return?'),
+                    content: Text('The scheduled return date is ${_fmt(booking.endDate)}. Are you sure you want to start the return process early?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), foregroundColor: Colors.white),
+                        child: const Text('Continue Early Return'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm != true) return;
+              }
+              if (context.mounted) _navigateToReturn(context, booking);
+            },
           ));
         }
       }
@@ -624,40 +690,61 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Future<void> _renterStartTrip(BuildContext ctx, BookingModel booking) async {
     final confirmed = await showDialog<bool>(
       context: ctx,
-      builder: (_) => AlertDialog(
-        title: const Text('Start Your Trip?'),
-        content: const Text('By starting the trip you confirm that the car has been handed over to you and the deposit has been paid.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
-            child: const Text('Start Trip'),
-          ),
-        ],
-      ),
+      builder: (dialogCtx) {
+        bool localLoading = false;
+        return StatefulBuilder(builder: (context, setLocalState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text('Start Your Trip?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            content: const Text('By starting the trip you confirm that the car has been handed over to you and the deposit has been paid.'),
+            actions: [
+              TextButton(
+                onPressed: localLoading ? null : () => Navigator.pop(dialogCtx, false), 
+                child: const Text('Cancel')
+              ),
+              ElevatedButton(
+                onPressed: localLoading ? null : () {
+                  setLocalState(() => localLoading = true);
+                  Navigator.pop(dialogCtx, true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A), 
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: localLoading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Start Trip'),
+              ),
+            ],
+          );
+        });
+      },
     );
-    if (confirmed != true || !ctx.mounted) return;
+    if (confirmed != true || !mounted) return;
+    setState(() => _isStartingTrip = true);
     try {
       await _service.renterStartTrip(booking.id);
-      if (ctx.mounted) {
-        Navigator.pushReplacement(ctx, MaterialPageRoute(
+      if (mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(
           builder: (_) => ActiveTripScreen(bookingId: booking.id),
         ));
-        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('🚗 Trip started! Drive safe.'),
           backgroundColor: Color(0xFF16A34A),
           behavior: SnackBarBehavior.floating,
         ));
       }
     } catch (e) {
-      if (ctx.mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _isStartingTrip = false);
     }
   }
 
@@ -665,26 +752,42 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Future<void> _renterReviewReturn(BuildContext ctx, BookingModel booking) async {
     final confirmed = await showDialog<bool>(
       context: ctx,
-      builder: (_) => AlertDialog(
-        title: const Text('End Trip?'),
-        content: const Text('Are you sure you want to confirm the return and end the trip?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
-            child: const Text('End Trip'),
-          ),
-        ],
-      ),
+      builder: (dialogCtx) {
+        bool localLoading = false;
+        return StatefulBuilder(builder: (context, setLocalState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text('End Trip?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            content: const Text('Are you sure you want to confirm the return and end the trip?'),
+            actions: [
+              TextButton(
+                onPressed: localLoading ? null : () => Navigator.pop(dialogCtx, false), 
+                child: const Text('Cancel')
+              ),
+              ElevatedButton(
+                onPressed: localLoading ? null : () {
+                  setLocalState(() => localLoading = true);
+                  Navigator.pop(dialogCtx, true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A), 
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: localLoading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('End Trip'),
+              ),
+            ],
+          );
+        });
+      },
     );
-    if (confirmed != true || !ctx.mounted) return;
+    if (confirmed != true || !mounted) return;
 
-    final snack = ScaffoldMessenger.of(ctx);
-    snack.showSnackBar(const SnackBar(
-      content: Text('Ending trip...'),
-      duration: Duration(seconds: 2),
-    ));
+    final messenger = ScaffoldMessenger.of(context);
+    
+    setState(() => _isConfirming = true);
 
     // Load post-trip inspection from Firestore
     PostTripInspection? postInspection;
@@ -700,12 +803,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       }
     } catch (_) {}
 
-    if (!ctx.mounted) return;
+    if (!mounted) return;
     if (postInspection == null) {
-      snack.showSnackBar(const SnackBar(
+      messenger.showSnackBar(const SnackBar(
         content: Text('Return inspection data not found.'),
         backgroundColor: Colors.orange,
       ));
+      setState(() => _isConfirming = false);
       return;
     }
 
@@ -723,21 +827,23 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         postInspection: postInspection,
         settlement: settlement,
       );
-      if (ctx.mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
           content: Text('✅ Trip completed! Thanks for using RozRides.'),
           backgroundColor: Color(0xFF16A34A),
           behavior: SnackBarBehavior.floating,
         ));
       }
     } catch (e) {
-      if (ctx.mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _isConfirming = false);
     }
   }
 
@@ -765,19 +871,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _actionBtn({required String label, required Color color, VoidCallback? onPressed, bool outlined = false}) {
+  Widget _actionBtn({required String label, required Color color, VoidCallback? onPressed, bool outlined = false, bool isLoading = false}) {
     if (outlined) {
       return SizedBox(
         width: double.infinity,
         height: 50,
         child: OutlinedButton(
-          onPressed: onPressed,
+          onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
             foregroundColor: color,
             side: BorderSide(color: color),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          child: isLoading 
+            ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: color))
+            : Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
       );
     }
@@ -785,14 +893,16 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           disabledBackgroundColor: Colors.grey.shade300,
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: isLoading
+          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+          : Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

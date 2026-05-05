@@ -58,25 +58,10 @@ class _PostTripInspectionScreenState extends State<PostTripInspectionScreen> {
   }
 
   Future<void> _pickPhoto(String area) async {
-    final src = await showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => SafeArea(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
-                onTap: () => Navigator.pop(context, ImageSource.camera)),
-            ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
-                onTap: () => Navigator.pop(context, ImageSource.gallery)),
-          ])),
-    );
-    if (src == null) return;
-    final xf = await _picker.pickImage(source: src, imageQuality: 80);
+    // Show a snackbar or local loader during pick
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening camera...'), duration: Duration(milliseconds: 500)));
+    
+    final xf = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
     if (xf == null) return;
     final old = _inspection.items[area]!;
     setState(() => _inspection = _inspection.copyWith(

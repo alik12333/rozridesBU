@@ -57,6 +57,7 @@ class _BookingSummaryScreenState extends State<BookingSummaryScreen> {
         carLocation:
             '${widget.listing.area ?? ''}, ${widget.listing.city ?? ''}'.trim().replaceAll(RegExp(r'^, |, $'), ''),
         renterName: context.read<AuthProvider>().currentUser?.fullName ?? 'Renter',
+        location: widget.listing.location,
       );
 
       if (mounted) {

@@ -109,16 +109,18 @@ class _HostBookingsScreenState extends State<HostBookingsScreen>
               ),
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              _BookingList(bookings: provider.hostPendingBookings, emptyMsg: ('No pending requests', 'Booking requests from renters will appear here.'), isHost: true),
-              _BookingList(bookings: provider.hostConfirmedBookings, emptyMsg: ('No upcoming bookings', 'Confirmed bookings will appear here.'), isHost: true),
-              _BookingList(bookings: provider.hostActiveBookings, emptyMsg: ('No active trips', 'Active rentals will appear here.'), isHost: true),
-              _BookingList(bookings: provider.hostFlaggedBookings, emptyMsg: ('No flagged trips', 'Trips under review will appear here.'), isHost: true),
-              _BookingList(bookings: provider.hostPastBookings, emptyMsg: ('No past bookings', 'Completed and cancelled bookings appear here.'), isHost: true),
-            ],
-          ),
+          body: provider.isHostListLoading 
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)))
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _BookingList(bookings: provider.hostPendingBookings, emptyMsg: ('No pending requests', 'Booking requests from renters will appear here.'), isHost: true),
+                  _BookingList(bookings: provider.hostConfirmedBookings, emptyMsg: ('No upcoming bookings', 'Confirmed bookings will appear here.'), isHost: true),
+                  _BookingList(bookings: provider.hostActiveBookings, emptyMsg: ('No active trips', 'Active rentals will appear here.'), isHost: true),
+                  _BookingList(bookings: provider.hostFlaggedBookings, emptyMsg: ('No flagged trips', 'Trips under review will appear here.'), isHost: true),
+                  _BookingList(bookings: provider.hostPastBookings, emptyMsg: ('No past bookings', 'Completed and cancelled bookings appear here.'), isHost: true),
+                ],
+              ),
         );
       },
     );
@@ -356,13 +358,19 @@ class _HostBookingCard extends StatelessWidget {
     VoidCallback? onTap;
 
     if (b.status == 'confirmed') {
-      final canStart = !DateTime.now().isBefore(
-          b.startDate.subtract(const Duration(hours: 2)));
-      
-      label = canStart ? 'Start Handover' : 'Available ${DateFormat('MMM d').format(b.startDate)}';
-      color = canStart ? const Color(0xFF16A34A) : Colors.grey.shade400;
-      onTap = canStart ? () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => PreTripInspectionScreen(booking: b))) : null;
+      if (b.preHandoverCompleted) {
+        label = 'Handover Complete';
+        color = Colors.grey.shade400;
+        onTap = null;
+      } else {
+        final canStart = !DateTime.now().isBefore(
+            b.startDate.subtract(const Duration(hours: 2)));
+        
+        label = canStart ? 'Start Handover' : 'Available ${DateFormat('MMM d').format(b.startDate)}';
+        color = canStart ? const Color(0xFF16A34A) : Colors.grey.shade400;
+        onTap = canStart ? () => Navigator.push(context, MaterialPageRoute(
+            builder: (_) => PreTripInspectionScreen(booking: b))) : null;
+      }
     } else if (b.status == 'active') {
       label = 'Complete Return';
       color = Colors.blue.shade700;

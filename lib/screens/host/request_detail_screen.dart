@@ -161,14 +161,20 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                         ),
                         onPressed: canConfirm
                             ? () async {
-                                Navigator.pop(ctx);
+                                setSheetState(() => selectedReason = selectedReason); // Trigger rebuild
                                 final reason = selectedReason == 'Other'
                                     ? customController.text.trim()
                                     : selectedReason!;
+                                
+                                // Show local loader in sheet
+                                setSheetState(() => selectedReason = 'LOADING_STATE'); 
+                                
                                 final ok = await context
                                     .read<BookingProvider>()
                                     .declineBooking(booking, reason);
+                                
                                 if (mounted) {
+                                  Navigator.pop(ctx);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(ok
@@ -182,9 +188,9 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                                 }
                               }
                             : null,
-                        child: const Text('Confirm Decline',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 15)),
+                        child: selectedReason == 'LOADING_STATE'
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Confirm Decline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     ),
                   ],
@@ -293,11 +299,11 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                             ? null
                             : () async {
                                 setSheet(() => isLoading = true);
-                                Navigator.pop(ctx);
                                 final ok = await context
                                     .read<BookingProvider>()
                                     .acceptBooking(booking.id);
                                 if (mounted) {
+                                  Navigator.pop(ctx);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(ok

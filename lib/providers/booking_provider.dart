@@ -13,6 +13,8 @@ class BookingProvider extends ChangeNotifier {
   List<BookingModel> _hostPendingBookings = [];
   List<BookingModel> _hostAllBookings     = [];
   List<BookingModel> _renterBookings      = [];
+  bool isHostListLoading = true;
+  bool isRenterListLoading = true;
   BookingActionStatus actionStatus        = BookingActionStatus.idle;
   String? errorMessage;
   String? _activeHostId;
@@ -82,6 +84,8 @@ class BookingProvider extends ChangeNotifier {
   void listenToHostBookings(String hostId) {
     if (_activeHostId == hostId) return;
     _activeHostId = hostId;
+    isHostListLoading = true;
+    notifyListeners();
 
     // Listen to pending bookings (for badge count)
     _hostPendingSub?.cancel();
@@ -100,15 +104,20 @@ class BookingProvider extends ChangeNotifier {
     _hostAllSub?.cancel();
     _hostAllSub = _service.getBookingsForHost(hostId).listen((bookings) {
       _hostAllBookings = bookings;
+      isHostListLoading = false;
       notifyListeners();
     }, onError: (e) {
       debugPrint('ERROR IN hostAllSub: $e');
+      isHostListLoading = false;
+      notifyListeners();
     });
   }
 
   void listenToRenterBookings(String renterId) {
     if (_activeRenterId == renterId) return;
     _activeRenterId = renterId;
+    isRenterListLoading = true;
+    notifyListeners();
 
     _renterSub?.cancel();
     _renterSub = _service.getRenterBookings(renterId).listen((bookings) async {
@@ -118,9 +127,12 @@ class BookingProvider extends ChangeNotifier {
         }
       }
       _renterBookings = bookings;
+      isRenterListLoading = false;
       notifyListeners();
     }, onError: (e) {
       debugPrint('ERROR IN renterSub: $e');
+      isRenterListLoading = false;
+      notifyListeners();
     });
   }
 

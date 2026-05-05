@@ -122,6 +122,7 @@ class BookingService {
     required String carPhoto,
     required String carLocation,
     required String renterName,
+    GeoPoint? location,
   }) async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) throw Exception('User not authenticated.');
@@ -177,6 +178,7 @@ class BookingService {
       'carName': carName,
       'carPhoto': carPhoto,
       'carLocation': carLocation,
+      'location': location,
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
       'totalDays': pricing.totalDays,
@@ -557,7 +559,7 @@ class BookingService {
         final hostSnap = await _firestore.collection('users').doc(hostId).get();
         final strikes = hostSnap.data()?['hostStats']?['cancellationStrikeCount'] ?? 0;
         if (strikes >= 3) {
-          await _firestore.collection('admin_alerts').add({
+          await _firestore.collection('adminAlerts').add({
             'type': 'host_cancellation_threshold',
             'hostId': hostId,
             'message': 'Host $cancellerName has reached $strikes cancellations and may require account review.',

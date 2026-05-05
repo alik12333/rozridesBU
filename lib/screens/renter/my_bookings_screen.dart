@@ -94,18 +94,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
         ),
       ),
       body: Consumer<BookingProvider>(
-        builder: (context, provider, _) => TabBarView(
-          controller: _tabController,
-          children: List.generate(_tabs.length, (i) {
-            final bookings = _getTabBookings(i, provider);
-            if (bookings.isEmpty) return _emptyState(i);
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: bookings.length,
-              itemBuilder: (_, j) => _BookingCard(booking: bookings[j]),
-            );
-          }),
-        ),
+        builder: (context, provider, _) {
+          if (provider.isRenterListLoading) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)));
+          }
+          return TabBarView(
+            controller: _tabController,
+            children: List.generate(_tabs.length, (i) {
+              final bookings = _getTabBookings(i, provider);
+              if (bookings.isEmpty) return _emptyState(i);
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: bookings.length,
+                itemBuilder: (_, j) => _BookingCard(booking: bookings[j]),
+              );
+            }),
+          );
+        },
       ),
     );
   }
