@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "RozRides Admin Panel",
     description: "Admin panel for managing RozRides users and listings",
+    icons: {
+        icon: "/logo.png",
+    },
 };
 
 export default function RootLayout({

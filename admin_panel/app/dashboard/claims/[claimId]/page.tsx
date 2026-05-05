@@ -440,7 +440,7 @@ export default function ClaimReviewPage() {
                         <div className="p-2 bg-purple-100 text-purple-700 rounded-full">
                             <Sparkles className="w-5 h-5" />
                         </div>
-                        <h3 className="font-bold text-lg text-purple-900">Gemini AI Assistant</h3>
+                        <h3 className="font-bold text-lg text-purple-900">AI Assistant</h3>
                     </div>
                     {aiStatus === 'idle' && (
                         <Button 
@@ -456,7 +456,7 @@ export default function ClaimReviewPage() {
                     <div className="mt-4 flex items-center justify-center gap-3 py-6">
                         <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
                         <span className="text-purple-700 font-medium animate-pulse">
-                            Gemini is analyzing inspections, host notes, and chat history...
+                            AI is analyzing inspections, host notes, and chat history...
                         </span>
                     </div>
                 )}
