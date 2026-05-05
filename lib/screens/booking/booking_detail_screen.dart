@@ -663,22 +663,28 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   /// Renter presses REVIEW & END TRIP after host submits return.
   Future<void> _renterReviewReturn(BuildContext ctx, BookingModel booking) async {
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('End Trip?'),
+        content: const Text('Are you sure you want to confirm the return and end the trip?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+            child: const Text('End Trip'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !ctx.mounted) return;
+
     final snack = ScaffoldMessenger.of(ctx);
     snack.showSnackBar(const SnackBar(
-      content: Text('Loading return inspection data…'),
+      content: Text('Ending trip...'),
       duration: Duration(seconds: 2),
     ));
-
-    // Load pre-trip inspection
-    final pre = await _service.fetchPreTripInspection(booking.id);
-    if (!ctx.mounted) return;
-    if (pre == null) {
-      snack.showSnackBar(const SnackBar(
-        content: Text('Could not load inspection data.'),
-        backgroundColor: Colors.red,
-      ));
-      return;
-    }
 
     // Load post-trip inspection from Firestore
     PostTripInspection? postInspection;
@@ -697,23 +703,42 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     if (!ctx.mounted) return;
     if (postInspection == null) {
       snack.showSnackBar(const SnackBar(
-        content: Text('Return inspection data not ready yet.'),
+        content: Text('Return inspection data not found.'),
         backgroundColor: Colors.orange,
       ));
       return;
     }
 
-    // Build a comparison result
-    final comparison = compareInspections(pre, postInspection);
+    final proposed = booking.proposedSettlement ?? {};
+    final settlement = CashSettlement(
+      rentPaid: (proposed['rentAmount'] as num?)?.toDouble() ?? booking.totalRent,
+      depositRefunded: (proposed['depositRefund'] as num?)?.toDouble() ?? booking.securityDeposit,
+      damageDeduction: (proposed['damageDeduction'] as num?)?.toDouble() ?? 0.0,
+    );
 
-    Navigator.push(ctx, MaterialPageRoute(
-      builder: (_) => CashSettlementScreen(
-        booking: booking,
-        comparison: comparison,
-        postInspection: postInspection!,
-        hostMode: false,
-      ),
-    ));
+    try {
+      await _service.completeTrip(
+        bookingId: booking.id,
+        carId: booking.carId,
+        postInspection: postInspection,
+        settlement: settlement,
+      );
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+          content: Text('✅ Trip completed! Thanks for using RozRides.'),
+          backgroundColor: Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
   }
 
   Widget _waitingBanner({required IconData icon, required String title, required String message}) {

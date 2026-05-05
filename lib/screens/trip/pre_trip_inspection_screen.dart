@@ -24,7 +24,6 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
   late PreTripInspection _inspection;
 
   // Step 1 state
-  final TextEditingController _depositCtrl = TextEditingController();
   bool _depositChecked = false;
 
   // Step 7 state
@@ -39,14 +38,12 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
   void initState() {
     super.initState();
     _inspection = PreTripInspection.blank(widget.booking.id);
-    _depositCtrl.text = widget.booking.securityDeposit.toStringAsFixed(0);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkEarlyEntry());
   }
 
   @override
   void dispose() {
     _pageCtrl.dispose();
-    _depositCtrl.dispose();
     _odometerCtrl.dispose();
     super.dispose();
   }
@@ -127,7 +124,7 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
   Future<void> _completeHandover() async {
     setState(() => _submitting = true);
     try {
-      final deposit = double.tryParse(_depositCtrl.text) ?? widget.booking.securityDeposit;
+      final deposit = 10000.0;
       final odometer = int.tryParse(_odometerCtrl.text) ?? 0;
       final finalInspection = _inspection.copyWith(
         depositCollected: deposit,
@@ -248,26 +245,11 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(children: [
-            const Text('Expected Amount', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const Text('Standard Security Deposit', style: TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 4),
-            Text('PKR ${widget.booking.securityDeposit.toStringAsFixed(0)}',
+            Text('PKR 10,000',
                 style: GoogleFonts.outfit(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
           ]),
-        ),
-        const SizedBox(height: 20),
-        TextField(
-          controller: _depositCtrl,
-          keyboardType: TextInputType.number,
-          maxLength: 8,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            labelText: 'Amount Received (PKR)',
-            prefixIcon: const Icon(Icons.money),
-            counterText: '',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true, fillColor: Colors.white,
-          ),
-          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 20),
         Container(
@@ -291,13 +273,13 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
           value: _depositChecked,
           onChanged: (v) => setState(() => _depositChecked = v ?? false),
           activeColor: const Color(0xFF7C3AED),
-          title: Text('I have received PKR ${_depositCtrl.text.isEmpty ? widget.booking.securityDeposit.toStringAsFixed(0) : _depositCtrl.text} cash from the renter.',
-              style: const TextStyle(fontSize: 14)),
+          title: const Text('I have received PKR 10,000 cash from the renter.',
+              style: TextStyle(fontSize: 14)),
           contentPadding: EdgeInsets.zero,
           controlAffinity: ListTileControlAffinity.leading,
         ),
         const SizedBox(height: 24),
-        _nextButton(_depositChecked && _depositCtrl.text.isNotEmpty),
+        _nextButton(_depositChecked),
       ]),
     );
   }
@@ -446,7 +428,7 @@ class _PreTripInspectionScreenState extends State<PreTripInspectionScreen> {
   Widget _buildSummary() {
     bool hostSigned = _inspection.hostSigned;
     bool renterSigned = _inspection.renterSigned;
-    final deposit = double.tryParse(_depositCtrl.text) ?? widget.booking.securityDeposit;
+    final deposit = 10000.0;
     final photos = _areas.where((a) => _inspection.items[a]!.photoUrls.isNotEmpty).length;
     final damageNotes = _areas
         .where((a) => _inspection.items[a]!.hasDamage && _inspection.items[a]!.notes.isNotEmpty)
