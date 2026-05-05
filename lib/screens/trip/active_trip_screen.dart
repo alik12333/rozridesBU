@@ -401,13 +401,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             const SizedBox(height: 20),
 
             // Countdown
-            _buildCountdown(booking.endDate),
+            _buildCountdown(booking.actualEndDate),
             const SizedBox(height: 12),
 
             // Return info
             _card(
                 child: Column(children: [
-              _infoRow(Icons.event, 'Return by', _fmtFull(booking.endDate)),
+              _infoRow(Icons.event, 'Return by', _fmtFull(booking.actualEndDate)),
               _infoRow(Icons.place_outlined, 'Return to', booking.carLocation),
             ])),
             const SizedBox(height: 12),
@@ -584,13 +584,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           const SizedBox(height: 12),
 
           // Countdown
-          _buildCountdown(booking.endDate),
+          _buildCountdown(booking.actualEndDate),
           const SizedBox(height: 12),
 
           // Return info
           _card(
               child: Column(children: [
-            _infoRow(Icons.event, 'Return by', _fmtFull(booking.endDate)),
+            _infoRow(Icons.event, 'Return by', _fmtFull(booking.actualEndDate)),
           ])),
           const SizedBox(height: 12),
 

@@ -216,7 +216,7 @@ class _BookingCardState extends State<_BookingCard> {
     switch (b.status) {
       case 'pending':   return 'Bring PKR ${b.securityDeposit.toStringAsFixed(0)} if accepted';
       case 'confirmed': return 'Bring PKR ${b.securityDeposit.toStringAsFixed(0)} on ${fmt.format(b.startDate)}';
-      case 'active':    return 'Return by ${fmt.format(b.endDate)}';
+      case 'active':    return 'Return by ${fmt.format(b.actualEndDate)}';
       case 'completed': return 'Trip completed ✓';
       default:          return '';
     }
@@ -339,7 +339,7 @@ class _BookingCardState extends State<_BookingCard> {
                       const SizedBox(width: 8),
                       Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.grey.shade400),
                       const SizedBox(width: 8),
-                      _dateChip(Icons.logout_rounded, fmt.format(b.endDate), 'Drop-off'),
+                      _dateChip(Icons.logout_rounded, fmt.format(b.actualEndDate), 'Drop-off'),
                     ],
                   ),
                   const SizedBox(height: 12),

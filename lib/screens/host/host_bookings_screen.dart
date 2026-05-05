@@ -333,7 +333,7 @@ class _HostBookingCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Icon(Icons.arrow_forward, size: 14, color: Colors.grey.shade400),
                     const SizedBox(width: 8),
-                    Text(fmt.format(b.endDate), style: const TextStyle(fontSize: 13)),
+                    Text(fmt.format(b.actualEndDate), style: const TextStyle(fontSize: 13)),
                     const SizedBox(width: 8),
                     Text('${b.totalDays}d',
                         style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),

@@ -93,6 +93,15 @@ class BookingModel {
   bool get isExpired =>
       status == 'pending' && DateTime.now().isAfter(expiresAt);
 
+  /// The dynamically calculated end date based on when the trip actually started.
+  /// If the trip hasn't started, it falls back to the scheduled endDate.
+  DateTime get actualEndDate {
+    if (tripStartedAt != null && totalDays > 0) {
+      return tripStartedAt!.add(Duration(days: totalDays));
+    }
+    return endDate;
+  }
+
   /// Reserved for future driver-assignment logic.
   bool get requiresDriverAssignment => false;
 

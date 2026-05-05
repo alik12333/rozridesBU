@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/conversation_model.dart';
 import '../../services/chat_service.dart';
 
@@ -26,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   
   ConversationModel? _conversation;
   bool _isHost = false;
+  String? _otherPartyPhone;
 
   @override
   void initState() {
@@ -40,12 +42,27 @@ class _ChatScreenState extends State<ChatScreen> {
           .doc(widget.conversationId)
           .get();
       if (snap.exists) {
+        final convo = ConversationModel.fromMap(snap.data()!, snap.id);
+        final isHost = widget.currentUserId == convo.hostId;
         setState(() {
-          _conversation =
-              ConversationModel.fromMap(snap.data()!, snap.id);
-          _isHost = widget.currentUserId == _conversation!.hostId;
+          _conversation = convo;
+          _isHost = isHost;
         });
-        
+
+        // Fetch the other party's phone number
+        final otherPartyId = isHost ? convo.renterId : convo.hostId;
+        try {
+          final userSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(otherPartyId)
+              .get();
+          if (userSnap.exists && mounted) {
+            setState(() {
+              _otherPartyPhone = userSnap.data()?['phoneNumber'] as String?;
+            });
+          }
+        } catch (_) {}
+
         await _chatService.resetUnreadCount(
           conversationId: widget.conversationId,
           isHost: _isHost,
@@ -53,6 +70,34 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       debugPrint('Error loading conversation: $e');
+    }
+  }
+
+  Future<void> _dialPhone() async {
+    final phone = _otherPartyPhone;
+    if (phone == null || phone.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone number not available.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    final uri = Uri(scheme: 'tel', path: phone.trim());
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open the phone dialer.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -182,8 +227,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.info_outline_rounded, color: Colors.grey),
-                onPressed: () {},
+                icon: const Icon(Icons.phone_rounded, color: Color(0xFF7C3AED)),
+                tooltip: 'Call',
+                onPressed: _dialPhone,
               ),
               const SizedBox(width: 8),
             ],
