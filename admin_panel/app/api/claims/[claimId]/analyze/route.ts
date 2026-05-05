@@ -18,14 +18,14 @@ export async function POST(
         const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
         const prompt = `
-Act as an impartial car rental dispute resolution expert. 
-You are given data from a car rental dispute.
-Your job is to analyze the discrepancy between pre-trip and post-trip damages, read the chat for context, and provide a fair recommendation based on evidence.
+Act as an elite, impartial car rental dispute resolution expert operating in Pakistan.
+You are reviewing a damage/dispute claim between a car Host and a Renter.
+Your job is to analyze the discrepancy between pre-trip and post-trip inspections, read the chat history for context, cross-reference the host's claim, and provide a fair recommendation based on objective evidence.
 
 Here is the data:
 Host Claim Description: ${claimDetails.description || 'None'}
 Host Claimed Amount: PKR ${claimDetails.hostClaimedAmount || 0}
-Deposit Amount: PKR ${claimDetails.depositAmount || 0}
+Security Deposit Amount: PKR ${claimDetails.depositAmount || 0}
 
 Pre-Trip Inspection:
 ${JSON.stringify(preTrip, null, 2)}
@@ -33,20 +33,50 @@ ${JSON.stringify(preTrip, null, 2)}
 Post-Trip Inspection:
 ${JSON.stringify(postTrip, null, 2)}
 
-Chat History between Host and Renter:
+Chat History:
 ${JSON.stringify(messages, null, 2)}
 
-Provide your recommendation as a JSON object with the following schema exactly (no markdown wrapping):
+### CONTEXT: RESOLUTION OPTIONS
+You must recommend one of the following four actions, matching the Admin Dashboard buttons exactly:
+
+1. "renter" (SIDE WITH RENTER): 
+   - Meaning: The host's claim is invalid, unproven, pre-existing, or normal wear and tear.
+   - Outcome: Renter gets their full deposit back.
+
+2. "host" (SIDE WITH HOST):
+   - Meaning: The host's claim is completely valid and accurate.
+   - Outcome: Host gets exactly what they claimed/asked for. (This is deducted from the renter's deposit).
+
+3. "split" (APPLY SPLIT):
+   - Meaning: The damage or cleaning issue is valid but minor. The repair cost is LESS than the full Security Deposit.
+   - Outcome: You must suggest a specific amount (PKR) to deduct from the deposit for the host. The renter gets the rest back.
+
+4. "extra" (APPLY EXTRA CHARGE):
+   - Meaning: The damage or loss is severe and significantly EXCEEDS the Security Deposit. 
+   - Outcome: The host keeps the full deposit, AND you must suggest the additional amount (PKR) the renter must pay on top of losing the deposit.
+
+### CONTEXT: PAKISTANI MARKET ESTIMATES (PKR)
+Use these baseline estimates to judge if the host's claimed amount is realistic, or to calculate your own suggested split/extra amounts:
+- Fuel: 401 PKR per Liter for Petrol, 500 PKR per Liter for Diesel. (A quarter tank missing is roughly 10-15 Liters, so ~4,000 - 7,500 PKR).
+- Basic Car Wash: 500 - 1,000 PKR.
+- Deep Interior Cleaning (stains, spills, smoking odors): 3,000 - 5,000 PKR.
+- Minor Scratch Buffing/Compound: 1,500 - 3,000 PKR.
+- Single Panel Repaint (bumper, fender, door due to deep scratch/dent): 8,000 - 15,000 PKR.
+- Major Denting + Painting: 15,000 - 25,000+ PKR per panel.
+- Interior Cigarette Burn on Seat: 2,000 - 4,000 PKR.
+- Broken plastic trim / AC Vent: 3,000 - 8,000 PKR.
+
+### INSTRUCTIONS
+1. Look for definitive proof of new damage by comparing Pre-Trip and Post-Trip notes.
+2. Read the chat. Did the renter admit fault? Did the host mention it immediately?
+3. Evaluate the host's claimed amount against the market estimates above. Is the host overcharging?
+4. Output your recommendation strictly as a JSON object (no markdown wrapping) using this schema:
+
 {
   "recommendation": "host" | "renter" | "split" | "extra",
-  "reasoning": "A clear, professional explanation of your findings. Use bullet points (with a dash -) and short paragraphs to make it highly readable. Use explicit newline characters (\\n) for line breaks.",
-  "suggestedSplitAmount": number (Optional: if 'split', suggest an amount for the host to keep from the deposit. If 'extra', suggest an amount for the renter to pay over the deposit. Otherwise 0.)
+  "reasoning": "A highly detailed, professional explanation of your findings. Reference specific evidence (or lack thereof), compare the claimed amount to market realities, and justify your chosen outcome. Use bullet points (with a dash -) and short paragraphs to make it highly readable. Use explicit newline characters (\\n) for line breaks.",
+  "suggestedSplitAmount": number (Required if recommendation is 'split' or 'extra'. Put 0 if 'host' or 'renter'.)
 }
-
-If no new damage is found in the post-trip vs pre-trip and chat doesn't prove damage, side with "renter".
-If clear physical damage is new and substantial, side with "host".
-If it's minor, wear and tear, or cleaning issue, consider "split".
-If it's related to late return or severe abuse requiring more than the deposit, consider "extra".
 `;
 
         const result = await model.generateContent(prompt);
