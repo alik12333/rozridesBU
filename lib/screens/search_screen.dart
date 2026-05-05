@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/listing_provider.dart';
 import '../models/listing_model.dart';
+import '../widgets/car_image_carousel.dart';
 import 'car_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -362,26 +363,12 @@ class _SearchResultCard extends StatelessWidget {
           child: Row(
             children: [
               // Image
-              if (listing.images.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    listing.images.first,
-                    width: 100,
-                    height: 80,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              else
-                Container(
-                  width: 100,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.directions_car, size: 40),
-                ),
+              CarImageCarousel(
+                images: listing.images,
+                height: 80,
+                width: 100,
+                borderRadius: BorderRadius.circular(8),
+              ),
               
               const SizedBox(width: 12),
               

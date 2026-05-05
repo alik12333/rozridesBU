@@ -16,6 +16,7 @@ import 'my_listings_screen.dart';
 import 'add_listing_screen.dart';
 import 'chat/conversations_list_screen.dart';
 import '../providers/chat_provider.dart';
+import '../widgets/car_image_carousel.dart';
 
 // ── Brand colours (mirrors AppTheme) ─────────────────────────────────────────
 const _kPrimary   = Color(0xFF6200EE);
@@ -448,18 +449,10 @@ class _CarCard extends StatelessWidget {
             // ── Image ────────────────────────────────────────────────────
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: listing.images.isNotEmpty
-                      ? Image.network(
-                          listing.images.first,
-                          height: 190,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _imgPlaceholder(),
-                        )
-                      : _imgPlaceholder(),
+                CarImageCarousel(
+                  images: listing.images,
+                  height: 190,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 // price badge
                 Positioned(

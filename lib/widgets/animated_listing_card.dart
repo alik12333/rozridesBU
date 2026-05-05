@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/listing_model.dart';
+import 'car_image_carousel.dart';
+
 
 class AnimatedListingCard extends StatelessWidget {
   final ListingModel listing;
@@ -53,26 +55,9 @@ class AnimatedListingCard extends StatelessWidget {
                   children: [
                     Hero(
                       tag: 'listing_${listing.id}',
-                      child: SizedBox(
+                      child: CarImageCarousel(
+                        images: listing.images,
                         height: 220,
-                        width: double.infinity,
-                        child: listing.images.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: listing.images.first,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.grey[100],
-                                  child: const Center(child: CircularProgressIndicator()),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[100],
-                                  child: const Icon(Icons.directions_car, size: 50, color: Colors.grey),
-                                ),
-                              )
-                            : Container(
-                                color: Colors.grey[100],
-                                child: const Icon(Icons.directions_car, size: 50, color: Colors.grey),
-                              ),
                       ),
                     ),
                     // Gradient Overlay
