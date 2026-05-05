@@ -342,24 +342,11 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
             ],
           ),
 
-          // 4. Overlaid Back Button and Actions
+          // 4. Overlaid Back Button
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 8,
-            right: 8,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _circleAction(Icons.arrow_back, () => Navigator.pop(context)),
-                Row(
-                  children: [
-                    _circleAction(Icons.share_outlined, () {}),
-                    const SizedBox(width: 4),
-                    _circleAction(Icons.favorite_border, () {}),
-                  ],
-                ),
-              ],
-            ),
+            child: _circleAction(Icons.arrow_back, () => Navigator.pop(context)),
           ),
         ],
       ),
@@ -482,7 +469,7 @@ class _CarDetailScreenState extends State<CarDetailScreen> {
                   ),
                 ),
                 Text(
-                  'Joined 2024 • Verified',
+                  'Verified',
                   style: GoogleFonts.outfit(
                     fontSize: 13,
                     color: Colors.blueGrey.shade500,
