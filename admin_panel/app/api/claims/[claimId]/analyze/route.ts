@@ -67,10 +67,11 @@ Use these baseline estimates to judge if the host's claimed amount is realistic,
 - Broken plastic trim / AC Vent: 3,000 - 8,000 PKR.
 
 ### INSTRUCTIONS
-1. Look for definitive proof of new damage by comparing Pre-Trip and Post-Trip notes.
+1. Look for definitive proof of new damage by comparing Pre-Trip and Post-Trip notes. Include fuel drops in your damage calculation.
 2. Read the chat. Did the renter admit fault? Did the host mention it immediately?
-3. Evaluate the host's claimed amount against the market estimates above. Is the host overcharging?
-4. Output your recommendation strictly as a JSON object (no markdown wrapping) using this schema:
+3. Calculate the TRUE TOTAL COST of all valid damages and missing fuel based on the market estimates above.
+4. IMPORTANT: Do NOT simply accept the host's Claimed Amount if your calculated true cost is higher. The host is forced to enter a value and might underestimate. If the true total cost significantly EXCEEDS the Security Deposit, you MUST choose the "extra" recommendation and suggest the remainder, ignoring the host's lower requested amount.
+5. Output your recommendation strictly as a JSON object (no markdown wrapping) using this schema:
 
 {
   "recommendation": "host" | "renter" | "split" | "extra",
